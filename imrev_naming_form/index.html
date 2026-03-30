@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Imrev Naming Generator (Prototype)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <div class="brand__title">Imrev Naming Generator</div>
+          <div class="brand__subtitle">Прототип веб-форми без логіну</div>
+        </div>
+        <div class="header__actions">
+          <button id="btnReset" class="btn btn--ghost" type="button">Скинути</button>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="card">
+          <div class="card__title">1) Контекст</div>
+
+          <div class="row">
+            <label class="field">
+              <span class="field__label">Платформа</span>
+              <select id="platform" class="input">
+                <option value="meta">Meta Ads</option>
+                <option value="tiktok">TikTok Ads</option>
+                <option value="google">Google Ads</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Рівень</span>
+              <select id="level" class="input"></select>
+            </label>
+          </div>
+
+          <div id="fields" class="fields"></div>
+        </section>
+
+        <section class="card">
+          <div class="card__title">2) Результат</div>
+
+          <div class="result">
+            <div class="result__label">Згенерована назва</div>
+            <div class="result__valueWrap">
+              <input id="resultName" class="input input--mono" readonly />
+              <button id="btnCopyName" class="btn" type="button">Copy</button>
+            </div>
+            <div id="resultHints" class="hints"></div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="result">
+            <div class="result__label">UTM / Tracking (шаблон)</div>
+            <div class="result__valueWrap">
+              <textarea id="resultTracking" class="input input--mono textarea" readonly></textarea>
+              <button id="btnCopyTracking" class="btn" type="button">Copy</button>
+            </div>
+            <div class="note">
+              Важливо: назви в UTM вручну не вписуємо — лише стандартний шаблон (макроси).
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="result">
+            <div class="result__label">Швидкі шаблони</div>
+            <div class="chips">
+              <button id="chipMetaConv" class="chip" type="button">Meta • CONV • E-commerce</button>
+              <button id="chipTikTokConv" class="chip" type="button">TikTok • CONV • SPC</button>
+              <button id="chipGoogleLeadSearch" class="chip" type="button">Google • LEAD • SRCH</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer__text">
+          Роздільник назви: <span class="mono">" | "</span>. Тільки латиниця. Дата: <span class="mono">YYMMDD</span>.
+        </div>
+        <div class="footer__text">
+          Прототип: локальний файл без серверу.
+        </div>
+      </footer>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
