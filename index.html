@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imrev Tools Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        deepblue: {
+                            600: '#1e3a8a',
+                            700: '#1e3a5f',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <header class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 class="text-2xl font-extrabold text-deepblue-600 tracking-tight">
+                <i class="fa-solid fa-layer-group mr-2"></i>Imrev Tools
+            </h1>
+        </div>
+    </header>
+
+    <section class="max-w-6xl mx-auto px-4 py-12 text-center">
+        <h2 class="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Внутрішній простір</h2>
+        <p class="text-lg text-slate-600 max-w-2xl mx-auto">Інструменти для автоматизації та аналітики рекламних кампаній.</p>
+    </section>
+
+    <main class="max-w-6xl mx-auto px-4 flex-grow mb-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-300 flex flex-col">
+                <div class="p-6 flex-grow">
+                    <div class="w-12 h-12 bg-blue-100 text-deepblue-600 rounded-lg flex items-center justify-center text-xl mb-4">
+                        <i class="fa-solid fa-tags"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Генератор Неймінгу</h3>
+                    <p class="text-slate-600 text-sm mb-4">Створення стандартизованих назв для кампаній у Meta, TikTok та Google Ads згідно зі стандартами.</p>
+                </div>
+                <div class="px-6 pb-6 mt-auto">
+                    <a href="imrev_naming_form/index.html" class="w-full bg-deepblue-600 hover:bg-deepblue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 flex justify-center items-center gap-2">
+                        <span>Відкрити інструмент</span>
+                        <i class="fa-solid fa-arrow-right text-sm"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-300 flex flex-col opacity-75">
+                <div class="p-6 flex-grow">
+                    <div class="w-12 h-12 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Калькулятор KPI</h3>
+                    <p class="text-slate-600 text-sm mb-4">Швидкий розрахунок відсотка виконання планових показників.</p>
+                </div>
+                <div class="px-6 pb-6 mt-auto">
+                    <button class="w-full bg-slate-100 text-slate-500 font-medium py-2.5 px-4 rounded-lg cursor-not-allowed">
+                        В розробці
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>
