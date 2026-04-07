@@ -9,6 +9,8 @@ async function main() {
   await rm(dest, { recursive: true, force: true })
   await mkdir(dest, { recursive: true })
   await cp(src, dest, { recursive: true })
+  // Redirects are handled at repo root; avoid conflicting rules inside /calculator.
+  await rm(resolve(dest, '_redirects'), { force: true })
   console.log(`Copied calculator build to ${dest}`)
 }
 
