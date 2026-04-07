@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useNavigate } from 'react-router-dom'
 import { calculateKpi } from '../domain/kpiEngine'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabaseClient'
@@ -57,6 +58,7 @@ function periodLabel(p: DbPeriod) {
 
 export function DashboardPage() {
   const { user, profile } = useAuth()
+  const navigate = useNavigate()
   const [points, setPoints] = useState<Point[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -929,7 +931,7 @@ export function DashboardPage() {
             <div>Немає даних для графіка.</div>
             <button
               className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-              onClick={() => window.location.assign('/kpi')}
+              onClick={() => navigate('/kpi')}
             >
               Перейти в KPI і розрахувати
             </button>
@@ -959,7 +961,7 @@ export function DashboardPage() {
               <div>Немає даних. Натисніть “РОЗРАХУВАТИ” у `/kpi` для цього періоду.</div>
               <button
                 className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                onClick={() => window.location.assign('/kpi')}
+                onClick={() => navigate('/kpi')}
               >
                 Перейти в KPI і розрахувати
               </button>
@@ -993,7 +995,7 @@ export function DashboardPage() {
                 <div>Немає даних. Натисніть “РОЗРАХУВАТИ” у `/kpi` для цього періоду.</div>
                 <button
                   className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                  onClick={() => window.location.assign('/kpi')}
+                  onClick={() => navigate('/kpi')}
                 >
                   Перейти в KPI і розрахувати
                 </button>
