@@ -1,0 +1,10 @@
+{
+  "name": "my-marketing-toolbox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:calculator": "npm ci --prefix marketing-kpi-web && npm run build --prefix marketing-kpi-web && node scripts/copy-calculator.mjs",
+    "build": "npm run build:calculator"
+  }
+}
+

@@ -1,0 +1,11 @@
+[build]
+  base = "."
+  command = "npm run build"
+  publish = "dist"
+
+# Single Page App routing (react-router-dom)
+[[redirects]]
+  from = "/calculator/*"
+  to = "/calculator/index.html"
+  status = 200
+

@@ -1,0 +1,10 @@
+# Root build artifacts
+calculator/
+
+# marketing-kpi-web
+marketing-kpi-web/node_modules/
+marketing-kpi-web/dist/
+marketing-kpi-web/.env
+marketing-kpi-web/.env.*
+!marketing-kpi-web/.env.example
+

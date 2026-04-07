@@ -138,6 +138,7 @@ const SCHEMA = {
                 ["CAR", "CAR — карусель"],
                 ["COL", "COL — collection"],
                 ["DPA", "DPA — каталог"],
+                ["POST", "POST — пост на сторінці FB/IG (existing post)"],
               ],
             },
             {
@@ -1008,6 +1009,16 @@ function updateResult() {
   const segments = computeSegments(state.platform, state.level, state.values);
   $("resultName").value = joinSegments(segments);
   $("resultTracking").value = platform.trackingTemplate;
+  const trackingNotice = $("trackingNotice");
+  if (trackingNotice) {
+    if (state.platform === "meta" || state.platform === "tiktok") {
+      trackingNotice.textContent = "Поки що цими UTM-шаблонами (Meta/TikTok) не користуємось — залишаємо як довідник."
+      trackingNotice.style.display = "";
+    } else {
+      trackingNotice.textContent = "";
+      trackingNotice.style.display = "none";
+    }
+  }
 
   const issues = validate(state.platform, state.level, state.values);
   renderHints(issues);

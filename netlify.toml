@@ -1,0 +1,9 @@
+[build]
+  command = "npm ci --prefix marketing-kpi-web && npm run build --prefix marketing-kpi-web && node scripts/copy-calculator.mjs"
+  publish = "."
+
+[[redirects]]
+  from = "/calculator/*"
+  to = "/calculator/index.html"
+  status = 200
+
