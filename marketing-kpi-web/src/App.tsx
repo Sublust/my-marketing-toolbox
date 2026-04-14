@@ -8,6 +8,11 @@ const LoginPage = lazy(async () => {
   return { default: mod.LoginPage }
 })
 
+const ResetPasswordPage = lazy(async () => {
+  const mod = await import('./pages/ResetPasswordPage')
+  return { default: mod.ResetPasswordPage }
+})
+
 const KpiEntryPage = lazy(async () => {
   const mod = await import('./pages/KpiEntryPage')
   return { default: mod.KpiEntryPage }
@@ -32,6 +37,15 @@ export default function App() {
           element={
             <Suspense fallback={<div className="py-10 text-sm text-gray-600 dark:text-gray-400">Завантаження…</div>}>
               <LoginPage />
+            </Suspense>
+          }
+        />
+
+        <Route
+          path="/reset-password"
+          element={
+            <Suspense fallback={<div className="py-10 text-sm text-gray-600 dark:text-gray-400">Завантаження…</div>}>
+              <ResetPasswordPage />
             </Suspense>
           }
         />
