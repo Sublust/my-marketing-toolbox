@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { PeriodPicker } from '../components/PeriodPicker'
-import { ProjectTable, type KpiTableCellKey } from '../components/ProjectTable'
+import { ProjectTable, type KpiTableCellKey, type ProjectSortDir, type ProjectSortKey } from '../components/ProjectTable'
 import { useAuth } from '../context/AuthProvider'
 import { calculateKpi, type KpiResults, type ProjectInput, type Weights } from '../domain/kpiEngine'
 import { supabase } from '../lib/supabaseClient'
@@ -28,6 +28,10 @@ export function KpiEntryPage() {
   const [weights, setWeights] = useState<Weights>(DEFAULT_WEIGHTS)
   const [isPersisting, setIsPersisting] = useState(false)
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false)
+  const [projectSort, setProjectSort] = useState<{ key: ProjectSortKey; dir: ProjectSortDir }>({
+    key: 'name',
+    dir: 'asc',
+  })
 
   const pmUsersById = useMemo(() => Object.fromEntries(pms.map((p) => [p.id, p])), [pms])
   const isAdmin = profile?.role === 'admin'
@@ -61,6 +65,45 @@ export function KpiEntryPage() {
     // closed period: keep active + projects that had data in this period
     return projects.filter((p) => p.is_active || projectIdsWithDataInPeriod.has(p.id))
   }, [projects, period, projectIdsWithDataInPeriod])
+
+  const sortedVisibleProjects = useMemo(() => {
+    const list = [...visibleProjects]
+    const dirMul = projectSort.dir === 'asc' ? 1 : -1
+    const categoryOrder: Record<string, number> = { VIP: 0, A: 1, B: 2, C: 3 }
+
+    const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase()
+    const pmLabel = (p: DbProject) =>
+      norm(p.pm_name) || norm(p.pm_id ? pmUsersById[p.pm_id]?.full_name : '') || ''
+    const pmAccessLabel = (p: DbProject) => norm(p.pm_id ? pmUsersById[p.pm_id]?.full_name : '') || ''
+
+    list.sort((a, b) => {
+      let av = ''
+      let bv = ''
+
+      if (projectSort.key === 'name') {
+        av = norm(a.name)
+        bv = norm(b.name)
+      } else if (projectSort.key === 'category') {
+        const ao = categoryOrder[String(a.category)] ?? 999
+        const bo = categoryOrder[String(b.category)] ?? 999
+        if (ao !== bo) return (ao - bo) * dirMul
+        av = norm(a.name)
+        bv = norm(b.name)
+      } else if (projectSort.key === 'pm') {
+        av = pmLabel(a)
+        bv = pmLabel(b)
+      } else {
+        av = pmAccessLabel(a)
+        bv = pmAccessLabel(b)
+      }
+
+      const cmp = av.localeCompare(bv, 'uk')
+      if (cmp !== 0) return cmp * dirMul
+      return norm(a.name).localeCompare(norm(b.name), 'uk') * dirMul
+    })
+
+    return list
+  }, [visibleProjects, projectSort, pmUsersById])
 
   const canEditProject = (project: DbProject) => {
     if (!profile?.role || !user?.id) return false
@@ -694,7 +737,7 @@ export function KpiEntryPage() {
           {isProjectsCollapsed ? null : (
             <div className="border-t border-gray-200 px-2 pb-2 dark:border-gray-800">
               <ProjectTable
-                projects={visibleProjects}
+                projects={sortedVisibleProjects}
                 pms={pms}
                 pmUsersById={pmUsersById}
                 specialists={specialists}
@@ -704,6 +747,8 @@ export function KpiEntryPage() {
                 onCellChange={onCellChange}
                 canAssignPm={isAdmin}
                 onProjectPmChange={onProjectPmChange}
+                sort={projectSort}
+                onSortChange={setProjectSort}
                 onDeleteProject={isAdmin ? deleteProject : undefined}
               />
             </div>

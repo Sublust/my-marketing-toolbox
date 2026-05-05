@@ -1,6 +1,6 @@
 import type { DbPerson, DbProject, DbUserProfile, TaskRole } from '../lib/types'
 import { KpiCell, type KpiCellValue } from './KpiCell'
-import { Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
 
 const ROLE_LABELS: Record<TaskRole, string> = {
   seo: 'SEO',
@@ -10,6 +10,18 @@ const ROLE_LABELS: Record<TaskRole, string> = {
 }
 
 export type KpiTableCellKey = `${string}:${TaskRole}`
+
+export type ProjectSortKey = 'name' | 'category' | 'pm' | 'pm_access'
+export type ProjectSortDir = 'asc' | 'desc'
+
+function SortIcon(props: { active: boolean; dir: ProjectSortDir }) {
+  if (!props.active) return <span className="inline-block w-4" />
+  return props.dir === 'asc' ? (
+    <ArrowUp className="h-4 w-4" />
+  ) : (
+    <ArrowDown className="h-4 w-4" />
+  )
+}
 
 export function ProjectTable(props: {
   projects: DbProject[]
@@ -22,6 +34,8 @@ export function ProjectTable(props: {
   onCellChange: (args: { projectId: string; role: TaskRole; next: KpiCellValue }) => Promise<void>
   canAssignPm: boolean
   onProjectPmChange: (args: { projectId: string; pmUserId: string | null }) => Promise<void>
+  sort: { key: ProjectSortKey; dir: ProjectSortDir }
+  onSortChange: (next: { key: ProjectSortKey; dir: ProjectSortDir }) => void
   onDeleteProject?: (projectId: string) => Promise<void>
 }) {
   if (props.projects.length === 0) {
@@ -38,16 +52,56 @@ export function ProjectTable(props: {
         <thead className="bg-gray-50 dark:bg-gray-900">
           <tr>
             <th className="sticky left-0 z-30 px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
-              Проєкт
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                onClick={() => {
+                  const isActive = props.sort.key === 'name'
+                  const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
+                  props.onSortChange({ key: 'name', dir })
+                }}
+              >
+                Проєкт <SortIcon active={props.sort.key === 'name'} dir={props.sort.dir} />
+              </button>
             </th>
             <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Кат.
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                onClick={() => {
+                  const isActive = props.sort.key === 'category'
+                  const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
+                  props.onSortChange({ key: 'category', dir })
+                }}
+              >
+                Кат. <SortIcon active={props.sort.key === 'category'} dir={props.sort.dir} />
+              </button>
             </th>
             <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              PM
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                onClick={() => {
+                  const isActive = props.sort.key === 'pm'
+                  const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
+                  props.onSortChange({ key: 'pm', dir })
+                }}
+              >
+                PM <SortIcon active={props.sort.key === 'pm'} dir={props.sort.dir} />
+              </button>
             </th>
             <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              PM (доступ)
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                onClick={() => {
+                  const isActive = props.sort.key === 'pm_access'
+                  const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
+                  props.onSortChange({ key: 'pm_access', dir })
+                }}
+              >
+                PM (доступ) <SortIcon active={props.sort.key === 'pm_access'} dir={props.sort.dir} />
+              </button>
             </th>
             {props.roles.map((r) => (
               <th
