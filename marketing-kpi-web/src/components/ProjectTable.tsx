@@ -13,12 +13,15 @@ export type KpiTableCellKey = `${string}:${TaskRole}`
 
 export function ProjectTable(props: {
   projects: DbProject[]
+  pms: DbUserProfile[]
   pmUsersById: Record<string, DbUserProfile>
   specialists: DbPerson[]
   roles: TaskRole[]
   cellValues: Record<KpiTableCellKey, KpiCellValue | undefined>
   canEditProject: (project: DbProject) => boolean
   onCellChange: (args: { projectId: string; role: TaskRole; next: KpiCellValue }) => Promise<void>
+  canAssignPm: boolean
+  onProjectPmChange: (args: { projectId: string; pmUserId: string | null }) => Promise<void>
   onDeleteProject?: (projectId: string) => Promise<void>
 }) {
   if (props.projects.length === 0) {
@@ -42,6 +45,9 @@ export function ProjectTable(props: {
             </th>
             <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               PM
+            </th>
+            <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              PM (доступ)
             </th>
             {props.roles.map((r) => (
               <th
@@ -79,6 +85,25 @@ export function ProjectTable(props: {
                   <div className="max-w-[180px] truncate" title={pmName ?? ''}>
                     {pmName ?? '—'}
                   </div>
+                </td>
+                <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                  <select
+                    className="w-full max-w-[220px] rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+                    value={p.pm_id ?? ''}
+                    disabled={!props.canAssignPm}
+                    onChange={async (e) => {
+                      const nextId = e.target.value || null
+                      await props.onProjectPmChange({ projectId: p.id, pmUserId: nextId })
+                    }}
+                    title={props.canAssignPm ? 'Вибрати PM, який має право редагувати KPI' : 'Доступно лише для admin'}
+                  >
+                    <option value="">—</option>
+                    {props.pms.map((pm) => (
+                      <option key={pm.id} value={pm.id}>
+                        {pm.full_name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 {props.roles.map((role) => {
                   const key: KpiTableCellKey = `${p.id}:${role}`

@@ -294,6 +294,58 @@ export function KpiEntryPage() {
     })
   }
 
+  const onProjectPmChange = async (args: { projectId: string; pmUserId: string | null }) => {
+    if (!isAdmin) return
+    setError(null)
+
+    const pmUser = args.pmUserId ? pmUsersById[args.pmUserId] ?? null : null
+    const pmName = pmUser?.full_name?.trim() ? pmUser.full_name.trim() : null
+
+    let pmPersonId: string | null = null
+    if (pmName) {
+      const { error: upErr } = await supabase
+        .from('people')
+        .upsert([{ full_name: pmName, person_type: 'pm', is_active: true }], { onConflict: 'full_name' })
+      if (upErr) {
+        setError(upErr.message)
+        return
+      }
+
+      const { data: pmPerson, error: pmSelErr } = await supabase
+        .from('people')
+        .select('id')
+        .eq('full_name', pmName)
+        .maybeSingle()
+      if (pmSelErr) {
+        setError(pmSelErr.message)
+        return
+      }
+      pmPersonId = (pmPerson as any)?.id ?? null
+    }
+
+    // Optimistic update
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === args.projectId
+          ? {
+              ...p,
+              pm_id: args.pmUserId,
+              pm_name: pmName,
+              pm_person_id: pmPersonId,
+            }
+          : p,
+      ),
+    )
+
+    const { error } = await supabase
+      .from('projects')
+      .update({ pm_id: args.pmUserId, pm_name: pmName, pm_person_id: pmPersonId })
+      .eq('id', args.projectId)
+    if (error) {
+      setError(error.message)
+    }
+  }
+
   const onCellChange = async (args: {
     projectId: string
     role: TaskRole
@@ -643,12 +695,15 @@ export function KpiEntryPage() {
             <div className="border-t border-gray-200 px-2 pb-2 dark:border-gray-800">
               <ProjectTable
                 projects={visibleProjects}
+                pms={pms}
                 pmUsersById={pmUsersById}
                 specialists={specialists}
                 roles={ROLES}
                 cellValues={cellValues}
                 canEditProject={canEditProject}
                 onCellChange={onCellChange}
+                canAssignPm={isAdmin}
+                onProjectPmChange={onProjectPmChange}
                 onDeleteProject={isAdmin ? deleteProject : undefined}
               />
             </div>
