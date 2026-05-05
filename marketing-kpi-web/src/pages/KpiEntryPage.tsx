@@ -66,7 +66,18 @@ export function KpiEntryPage() {
     if (!profile?.role || !user?.id) return false
     if (!period || period.is_closed) return false
     if (profile.role === 'admin') return true
-    if (profile.role === 'pm') return project.pm_id === user.id
+    if (profile.role === 'pm') {
+      if (project.pm_id && project.pm_id === user.id) return true
+
+      // Fallback for legacy/partial data: allow PM edit by name match.
+      // This prevents "can't edit in open period" when `projects.pm_id` is empty
+      // but `projects.pm_name` is filled.
+      const projectPmName = (project.pm_name ?? '').trim().toLowerCase()
+      const myName = (profile.full_name ?? '').trim().toLowerCase()
+      if (projectPmName && myName && projectPmName === myName) return true
+
+      return false
+    }
     return false
   }
 
