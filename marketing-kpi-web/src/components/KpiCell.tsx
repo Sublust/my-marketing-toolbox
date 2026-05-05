@@ -21,8 +21,17 @@ export function KpiCell(props: {
     [props.specialists],
   )
 
+  const scoreTone =
+    props.value.score === '1'
+      ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-100'
+      : props.value.score === '0'
+        ? 'border-red-300 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100'
+        : props.value.score === 'ж'
+          ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100'
+          : 'border-gray-300 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100'
+
   return (
-    <div className="flex w-32 flex-col gap-1 lg:w-40">
+    <div className="flex w-28 flex-col gap-1 lg:w-32">
       <select
         className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
         value={props.value.specialistId ?? ''}
@@ -46,7 +55,7 @@ export function KpiCell(props: {
       </select>
 
       <select
-        className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+        className={`w-full rounded-md border px-2 py-1 text-xs ${scoreTone}`}
         value={props.value.score}
         disabled={props.disabled || isSaving || !props.value.specialistId}
         onChange={async (e) => {

@@ -93,6 +93,7 @@ export function KpiEntryPage() {
         av = pmLabel(a)
         bv = pmLabel(b)
       } else {
+        // If user is not admin, they won't see / use this column.
         av = pmAccessLabel(a)
         bv = pmAccessLabel(b)
       }
@@ -104,6 +105,13 @@ export function KpiEntryPage() {
 
     return list
   }, [visibleProjects, projectSort, pmUsersById])
+
+  useEffect(() => {
+    if (isAdmin) return
+    if (projectSort.key === 'pm_access') {
+      setProjectSort({ key: 'pm', dir: 'asc' })
+    }
+  }, [isAdmin, projectSort.key])
 
   const canEditProject = (project: DbProject) => {
     if (!profile?.role || !user?.id) return false
@@ -745,6 +753,7 @@ export function KpiEntryPage() {
                 cellValues={cellValues}
                 canEditProject={canEditProject}
                 onCellChange={onCellChange}
+                showPmAccess={isAdmin}
                 canAssignPm={isAdmin}
                 onProjectPmChange={onProjectPmChange}
                 sort={projectSort}

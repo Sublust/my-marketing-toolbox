@@ -32,6 +32,7 @@ export function ProjectTable(props: {
   cellValues: Record<KpiTableCellKey, KpiCellValue | undefined>
   canEditProject: (project: DbProject) => boolean
   onCellChange: (args: { projectId: string; role: TaskRole; next: KpiCellValue }) => Promise<void>
+  showPmAccess: boolean
   canAssignPm: boolean
   onProjectPmChange: (args: { projectId: string; pmUserId: string | null }) => Promise<void>
   sort: { key: ProjectSortKey; dir: ProjectSortDir }
@@ -48,10 +49,10 @@ export function ProjectTable(props: {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-      <table className="min-w-[980px] w-full divide-y divide-gray-200 dark:divide-gray-800">
+      <table className="min-w-[980px] w-full table-fixed divide-y divide-gray-200 dark:divide-gray-800">
         <thead className="bg-gray-50 dark:bg-gray-900">
           <tr>
-            <th className="sticky left-0 z-30 px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
+            <th className="sticky left-0 z-30 w-[260px] px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
               <button
                 type="button"
                 className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
@@ -64,7 +65,7 @@ export function ProjectTable(props: {
                 Проєкт <SortIcon active={props.sort.key === 'name'} dir={props.sort.dir} />
               </button>
             </th>
-            <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <th className="w-[70px] px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               <button
                 type="button"
                 className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
@@ -77,7 +78,7 @@ export function ProjectTable(props: {
                 Кат. <SortIcon active={props.sort.key === 'category'} dir={props.sort.dir} />
               </button>
             </th>
-            <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <th className="w-[180px] px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               <button
                 type="button"
                 className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
@@ -90,28 +91,30 @@ export function ProjectTable(props: {
                 PM <SortIcon active={props.sort.key === 'pm'} dir={props.sort.dir} />
               </button>
             </th>
-            <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
-                onClick={() => {
-                  const isActive = props.sort.key === 'pm_access'
-                  const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
-                  props.onSortChange({ key: 'pm_access', dir })
-                }}
-              >
-                PM (доступ) <SortIcon active={props.sort.key === 'pm_access'} dir={props.sort.dir} />
-              </button>
-            </th>
+            {props.showPmAccess ? (
+              <th className="w-[190px] px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => {
+                    const isActive = props.sort.key === 'pm_access'
+                    const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
+                    props.onSortChange({ key: 'pm_access', dir })
+                  }}
+                >
+                  PM (доступ) <SortIcon active={props.sort.key === 'pm_access'} dir={props.sort.dir} />
+                </button>
+              </th>
+            ) : null}
             {props.roles.map((r) => (
               <th
                 key={r}
-                className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                className="w-[140px] px-2 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
               >
                 {ROLE_LABELS[r]}
               </th>
             ))}
-            <th className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <th className="w-[56px] px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               <span className="sr-only">Дії</span>
             </th>
           </tr>
@@ -127,45 +130,47 @@ export function ProjectTable(props: {
 
             return (
               <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/50">
-                <td className="sticky left-0 z-20 px-3 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800">
+                <td className="sticky left-0 z-20 w-[260px] px-3 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800">
                   <div className="max-w-[260px] truncate" title={p.name}>
                     {p.name}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                <td className="w-[70px] px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
                   {p.category}
                 </td>
-                <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                <td className="w-[180px] px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
                   <div className="max-w-[180px] truncate" title={pmName ?? ''}>
                     {pmName ?? '—'}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
-                  <select
-                    className="w-full max-w-[220px] rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                    value={p.pm_id ?? ''}
-                    disabled={!props.canAssignPm}
-                    onChange={async (e) => {
-                      const nextId = e.target.value || null
-                      await props.onProjectPmChange({ projectId: p.id, pmUserId: nextId })
-                    }}
-                    title={props.canAssignPm ? 'Вибрати PM, який має право редагувати KPI' : 'Доступно лише для admin'}
-                  >
-                    <option value="">—</option>
-                    {props.pms.map((pm) => (
-                      <option key={pm.id} value={pm.id}>
-                        {pm.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+                {props.showPmAccess ? (
+                  <td className="w-[190px] px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                    <select
+                      className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+                      value={p.pm_id ?? ''}
+                      disabled={!props.canAssignPm}
+                      onChange={async (e) => {
+                        const nextId = e.target.value || null
+                        await props.onProjectPmChange({ projectId: p.id, pmUserId: nextId })
+                      }}
+                      title={props.canAssignPm ? 'Вибрати PM, який має право редагувати KPI' : 'Доступно лише для admin'}
+                    >
+                      <option value="">—</option>
+                      {props.pms.map((pm) => (
+                        <option key={pm.id} value={pm.id}>
+                          {pm.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                ) : null}
                 {props.roles.map((role) => {
                   const key: KpiTableCellKey = `${p.id}:${role}`
                   const value =
                     props.cellValues[key] ?? { specialistId: null, score: '-', comment: null }
 
                   return (
-                    <td key={role} className="px-3 py-3">
+                    <td key={role} className="w-[140px] px-2 py-3 align-top">
                       <KpiCell
                         role={role}
                         specialists={props.specialists}
@@ -178,7 +183,7 @@ export function ProjectTable(props: {
                     </td>
                   )
                 })}
-                <td className="px-3 py-3 text-right">
+                <td className="w-[56px] px-3 py-3 text-right align-top">
                   {props.onDeleteProject ? (
                     <button
                       className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-red-600 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-red-300 dark:hover:bg-red-950/40"
