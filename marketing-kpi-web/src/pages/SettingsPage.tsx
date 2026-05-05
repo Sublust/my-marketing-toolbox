@@ -63,6 +63,9 @@ export function SettingsPage() {
     [users],
   )
 
+  const pmUsers = useMemo(() => users.filter((u) => u.role === 'pm'), [users])
+  const pmUsersById = useMemo(() => Object.fromEntries(pmUsers.map((u) => [u.id, u])), [pmUsers])
+
   const [people, setPeople] = useState<DbPerson[]>([])
   const peopleByName = useMemo(
     () => Object.fromEntries(people.map((p) => [p.full_name.trim().toLowerCase(), p])),
@@ -140,6 +143,53 @@ export function SettingsPage() {
       return
     }
     setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, is_active: !x.is_active } : x)))
+  }
+
+  const assignProjectPm = async (args: { projectId: string; pmUserId: string | null }) => {
+    if (!isAdmin) return
+    setProjectsError(null)
+
+    const pmUser = args.pmUserId ? pmUsersById[args.pmUserId] ?? null : null
+    const pmName = pmUser?.full_name?.trim() ? pmUser.full_name.trim() : null
+
+    let pmPersonId: string | null = null
+    if (pmName) {
+      const { error: upErr } = await supabase
+        .from('people')
+        .upsert([{ full_name: pmName, person_type: 'pm', is_active: true }], { onConflict: 'full_name' })
+      if (upErr) {
+        setProjectsError(upErr.message)
+        return
+      }
+
+      const { data: pmPerson, error: pmSelErr } = await supabase
+        .from('people')
+        .select('id')
+        .eq('full_name', pmName)
+        .maybeSingle()
+      if (pmSelErr) {
+        setProjectsError(pmSelErr.message)
+        return
+      }
+      pmPersonId = (pmPerson as any)?.id ?? null
+    }
+
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === args.projectId
+          ? { ...p, pm_id: args.pmUserId, pm_name: pmName, pm_person_id: pmPersonId }
+          : p,
+      ),
+    )
+
+    const { error } = await supabase
+      .from('projects')
+      .update({ pm_id: args.pmUserId, pm_name: pmName, pm_person_id: pmPersonId })
+      .eq('id', args.projectId)
+
+    if (error) {
+      setProjectsError(error.message)
+    }
   }
 
   const createCurrentPeriod = async () => {
@@ -696,11 +746,13 @@ export function SettingsPage() {
             ) : null}
 
             <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-              <table className="min-w-[720px] w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <table className="min-w-[880px] w-full divide-y divide-gray-200 dark:divide-gray-800">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Проєкт</th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Кат.</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">PM</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">PM (редагує KPI)</th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Активний</th>
                     <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Дія</th>
                   </tr>
@@ -710,6 +762,27 @@ export function SettingsPage() {
                     <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{p.category}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {p.pm_name?.trim() ? p.pm_name : p.pm_id ? pmUsersById[p.pm_id]?.full_name ?? '—' : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          className="w-full max-w-[240px] rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+                          value={p.pm_id ?? ''}
+                          onChange={async (e) => {
+                            const nextId = e.target.value || null
+                            await assignProjectPm({ projectId: p.id, pmUserId: nextId })
+                          }}
+                          title="Виберіть PM, який має право редагувати KPI для цього проєкту"
+                        >
+                          <option value="">—</option>
+                          {pmUsers.map((pm) => (
+                            <option key={pm.id} value={pm.id}>
+                              {pm.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="px-4 py-3 text-sm">
                         <span
                           className={[

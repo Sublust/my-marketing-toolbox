@@ -17,6 +17,7 @@ export function KpiEntryPage() {
   const [period, setPeriod] = useState<DbPeriod | null>(null)
   const [projects, setProjects] = useState<DbProject[]>([])
   const [specialists, setSpecialists] = useState<DbPerson[]>([])
+  const [pmPeople, setPmPeople] = useState<DbPerson[]>([])
   const [pms, setPms] = useState<DbUserProfile[]>([])
   const [cellValues, setCellValues] = useState<
     Record<KpiTableCellKey, { specialistId: string | null; score: DbKpiRecord['score']; comment: string | null }>
@@ -34,6 +35,7 @@ export function KpiEntryPage() {
   })
 
   const pmUsersById = useMemo(() => Object.fromEntries(pms.map((p) => [p.id, p])), [pms])
+  const pmPeopleById = useMemo(() => Object.fromEntries(pmPeople.map((p) => [p.id, p])), [pmPeople])
   const isAdmin = profile?.role === 'admin'
 
   /**
@@ -74,7 +76,6 @@ export function KpiEntryPage() {
     const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase()
     const pmLabel = (p: DbProject) =>
       norm(p.pm_name) || norm(p.pm_id ? pmUsersById[p.pm_id]?.full_name : '') || ''
-    const pmAccessLabel = (p: DbProject) => norm(p.pm_id ? pmUsersById[p.pm_id]?.full_name : '') || ''
 
     list.sort((a, b) => {
       let av = ''
@@ -92,10 +93,6 @@ export function KpiEntryPage() {
       } else if (projectSort.key === 'pm') {
         av = pmLabel(a)
         bv = pmLabel(b)
-      } else {
-        // If user is not admin, they won't see / use this column.
-        av = pmAccessLabel(a)
-        bv = pmAccessLabel(b)
       }
 
       const cmp = av.localeCompare(bv, 'uk')
@@ -105,13 +102,6 @@ export function KpiEntryPage() {
 
     return list
   }, [visibleProjects, projectSort, pmUsersById])
-
-  useEffect(() => {
-    if (isAdmin) return
-    if (projectSort.key === 'pm_access') {
-      setProjectSort({ key: 'pm', dir: 'asc' })
-    }
-  }, [isAdmin, projectSort.key])
 
   const canEditProject = (project: DbProject) => {
     if (!profile?.role || !user?.id) return false
@@ -161,22 +151,28 @@ export function KpiEntryPage() {
       setPeriod(nextPeriod)
 
       // People lists
-      const [{ data: specs, error: specsErr }, { data: pmsData, error: pmsErr }] = await Promise.all([
+      const [
+        { data: specs, error: specsErr },
+        { data: pmsData, error: pmsErr },
+        { data: pmPpl, error: pmPplErr },
+      ] = await Promise.all([
         supabase
           .from('people')
           .select('id, full_name, person_type, is_active')
           .eq('person_type', 'specialist')
           .order('full_name'),
         supabase.from('users').select('id, full_name, role').eq('role', 'pm').order('full_name'),
+        supabase.from('people').select('id, full_name, person_type, is_active').eq('person_type', 'pm').order('full_name'),
       ])
       if (!alive) return
-      if (specsErr || pmsErr) {
-        setError(specsErr?.message ?? pmsErr?.message ?? 'Помилка завантаження списків')
+      if (specsErr || pmsErr || pmPplErr) {
+        setError(specsErr?.message ?? pmsErr?.message ?? pmPplErr?.message ?? 'Помилка завантаження списків')
         setIsLoading(false)
         return
       }
       setSpecialists((specs ?? []) as DbPerson[])
       setPms((pmsData ?? []) as DbUserProfile[])
+      setPmPeople((pmPpl ?? []) as DbPerson[])
 
       // Projects
       const { data: proj, error: projErr } = await supabase
@@ -345,57 +341,6 @@ export function KpiEntryPage() {
     })
   }
 
-  const onProjectPmChange = async (args: { projectId: string; pmUserId: string | null }) => {
-    if (!isAdmin) return
-    setError(null)
-
-    const pmUser = args.pmUserId ? pmUsersById[args.pmUserId] ?? null : null
-    const pmName = pmUser?.full_name?.trim() ? pmUser.full_name.trim() : null
-
-    let pmPersonId: string | null = null
-    if (pmName) {
-      const { error: upErr } = await supabase
-        .from('people')
-        .upsert([{ full_name: pmName, person_type: 'pm', is_active: true }], { onConflict: 'full_name' })
-      if (upErr) {
-        setError(upErr.message)
-        return
-      }
-
-      const { data: pmPerson, error: pmSelErr } = await supabase
-        .from('people')
-        .select('id')
-        .eq('full_name', pmName)
-        .maybeSingle()
-      if (pmSelErr) {
-        setError(pmSelErr.message)
-        return
-      }
-      pmPersonId = (pmPerson as any)?.id ?? null
-    }
-
-    // Optimistic update
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === args.projectId
-          ? {
-              ...p,
-              pm_id: args.pmUserId,
-              pm_name: pmName,
-              pm_person_id: pmPersonId,
-            }
-          : p,
-      ),
-    )
-
-    const { error } = await supabase
-      .from('projects')
-      .update({ pm_id: args.pmUserId, pm_name: pmName, pm_person_id: pmPersonId })
-      .eq('id', args.projectId)
-    if (error) {
-      setError(error.message)
-    }
-  }
 
   const onCellChange = async (args: {
     projectId: string
@@ -520,7 +465,7 @@ export function KpiEntryPage() {
         })
       }
 
-      for (const [name, st] of Object.entries(res.pms)) {
+    for (const [name, st] of Object.entries(res.pms)) {
         if (!st.total || st.total <= 0) continue
         const pmPid = args.pmNameToPersonId[name] ?? null
         if (!pmPid) continue
@@ -567,11 +512,15 @@ export function KpiEntryPage() {
     )
 
     const inputProjects: ProjectInput[] = visibleProjects.map((p) => {
-      const pmName = p.pm_name?.trim()
-        ? p.pm_name
-        : p.pm_id
-          ? pmUsersById[p.pm_id]?.full_name ?? '-'
-          : '-'
+      // Canonical PM name should come from stable people.id (pm_person_id).
+      const canonicalPmName = p.pm_person_id ? pmPeopleById[p.pm_person_id]?.full_name ?? null : null
+      const pmName =
+        canonicalPmName?.trim() ||
+        (p.pm_name?.trim()
+          ? p.pm_name
+          : p.pm_id
+            ? pmUsersById[p.pm_id]?.full_name ?? '-'
+            : '-')
 
       const roles = Object.fromEntries(
         ROLES.map((role) => {
@@ -601,24 +550,34 @@ export function KpiEntryPage() {
     )
 
     // Ensure PMs exist in public.people and build name -> person_id mapping for snapshots.
-    let pmNameToPersonId: Record<string, string | null> = {}
+    // Key point: keep PM identity stable by using `people.id` (pm_person_id).
+    let pmNameToPersonId: Record<string, string | null> = Object.fromEntries(
+      pmPeople.map((p) => [p.full_name, p.id]),
+    )
     if (isAdmin && pmNames.length) {
-      const upRows = pmNames.map((n) => ({ full_name: n, person_type: 'pm' as const, is_active: true }))
-      const { error: pmUpErr } = await supabase.from('people').upsert(upRows, { onConflict: 'full_name' })
-      if (pmUpErr) {
-        setError(pmUpErr.message)
-        return
-      }
+      // Handle legacy cases: projects may have pm_name but missing pm_person_id / missing people row.
+      const missing = pmNames.filter((n) => !pmNameToPersonId[n])
+      if (missing.length) {
+        const upRows = missing.map((n) => ({ full_name: n, person_type: 'pm' as const, is_active: true }))
+        const { error: pmUpErr } = await supabase.from('people').upsert(upRows, { onConflict: 'full_name' })
+        if (pmUpErr) {
+          setError(pmUpErr.message)
+          return
+        }
 
-      const { data: pmPeople, error: pmSelErr } = await supabase
-        .from('people')
-        .select('id, full_name, person_type')
-        .in('full_name', pmNames)
-      if (pmSelErr) {
-        setError(pmSelErr.message)
-        return
+        const { data: pmPeople2, error: pmSelErr } = await supabase
+          .from('people')
+          .select('id, full_name, person_type, is_active')
+          .eq('person_type', 'pm')
+          .in('full_name', pmNames)
+        if (pmSelErr) {
+          setError(pmSelErr.message)
+          return
+        }
+
+        setPmPeople((pmPeople2 ?? []) as DbPerson[])
+        pmNameToPersonId = Object.fromEntries(((pmPeople2 ?? []) as any[]).map((p) => [p.full_name, p.id]))
       }
-      pmNameToPersonId = Object.fromEntries((pmPeople ?? []).map((p: any) => [p.full_name, p.id]))
     }
 
     const r = calculateKpi({
@@ -746,16 +705,12 @@ export function KpiEntryPage() {
             <div className="border-t border-gray-200 px-2 pb-2 dark:border-gray-800">
               <ProjectTable
                 projects={sortedVisibleProjects}
-                pms={pms}
                 pmUsersById={pmUsersById}
                 specialists={specialists}
                 roles={ROLES}
                 cellValues={cellValues}
                 canEditProject={canEditProject}
                 onCellChange={onCellChange}
-                showPmAccess={isAdmin}
-                canAssignPm={isAdmin}
-                onProjectPmChange={onProjectPmChange}
                 sort={projectSort}
                 onSortChange={setProjectSort}
                 onDeleteProject={isAdmin ? deleteProject : undefined}

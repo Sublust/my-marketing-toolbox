@@ -11,7 +11,7 @@ const ROLE_LABELS: Record<TaskRole, string> = {
 
 export type KpiTableCellKey = `${string}:${TaskRole}`
 
-export type ProjectSortKey = 'name' | 'category' | 'pm' | 'pm_access'
+export type ProjectSortKey = 'name' | 'category' | 'pm'
 export type ProjectSortDir = 'asc' | 'desc'
 
 function SortIcon(props: { active: boolean; dir: ProjectSortDir }) {
@@ -25,16 +25,12 @@ function SortIcon(props: { active: boolean; dir: ProjectSortDir }) {
 
 export function ProjectTable(props: {
   projects: DbProject[]
-  pms: DbUserProfile[]
   pmUsersById: Record<string, DbUserProfile>
   specialists: DbPerson[]
   roles: TaskRole[]
   cellValues: Record<KpiTableCellKey, KpiCellValue | undefined>
   canEditProject: (project: DbProject) => boolean
   onCellChange: (args: { projectId: string; role: TaskRole; next: KpiCellValue }) => Promise<void>
-  showPmAccess: boolean
-  canAssignPm: boolean
-  onProjectPmChange: (args: { projectId: string; pmUserId: string | null }) => Promise<void>
   sort: { key: ProjectSortKey; dir: ProjectSortDir }
   onSortChange: (next: { key: ProjectSortKey; dir: ProjectSortDir }) => void
   onDeleteProject?: (projectId: string) => Promise<void>
@@ -91,21 +87,6 @@ export function ProjectTable(props: {
                 PM <SortIcon active={props.sort.key === 'pm'} dir={props.sort.dir} />
               </button>
             </th>
-            {props.showPmAccess ? (
-              <th className="w-[190px] px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
-                  onClick={() => {
-                    const isActive = props.sort.key === 'pm_access'
-                    const dir: ProjectSortDir = isActive && props.sort.dir === 'asc' ? 'desc' : 'asc'
-                    props.onSortChange({ key: 'pm_access', dir })
-                  }}
-                >
-                  PM (доступ) <SortIcon active={props.sort.key === 'pm_access'} dir={props.sort.dir} />
-                </button>
-              </th>
-            ) : null}
             {props.roles.map((r) => (
               <th
                 key={r}
@@ -143,27 +124,6 @@ export function ProjectTable(props: {
                     {pmName ?? '—'}
                   </div>
                 </td>
-                {props.showPmAccess ? (
-                  <td className="w-[190px] px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
-                    <select
-                      className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                      value={p.pm_id ?? ''}
-                      disabled={!props.canAssignPm}
-                      onChange={async (e) => {
-                        const nextId = e.target.value || null
-                        await props.onProjectPmChange({ projectId: p.id, pmUserId: nextId })
-                      }}
-                      title={props.canAssignPm ? 'Вибрати PM, який має право редагувати KPI' : 'Доступно лише для admin'}
-                    >
-                      <option value="">—</option>
-                      {props.pms.map((pm) => (
-                        <option key={pm.id} value={pm.id}>
-                          {pm.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                ) : null}
                 {props.roles.map((role) => {
                   const key: KpiTableCellKey = `${p.id}:${role}`
                   const value =
