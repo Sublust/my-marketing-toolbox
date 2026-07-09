@@ -158,7 +158,7 @@ export function KpiEntryPage() {
       ] = await Promise.all([
         supabase
           .from('people')
-          .select('id, full_name, person_type, is_active')
+          .select('id, full_name, person_type, is_active, directions')
           .eq('person_type', 'specialist')
           .order('full_name'),
         supabase.from('users').select('id, full_name, role').eq('role', 'pm').order('full_name'),
