@@ -11,7 +11,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useNavigate } from 'react-router-dom'
 import { calculateKpi } from '../domain/kpiEngine'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabaseClient'
@@ -58,7 +57,6 @@ function periodLabel(p: DbPeriod) {
 
 export function DashboardPage() {
   const { user, profile } = useAuth()
-  const navigate = useNavigate()
   const [points, setPoints] = useState<Point[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -133,8 +131,8 @@ export function DashboardPage() {
 
       const { data: ppl } = await supabase
         .from('people')
-        .select('id, full_name, person_type, is_active')
-        .in('person_type', ['specialist', 'pm'])
+        .select('id, full_name, person_type, is_active, directions')
+        .eq('person_type', 'specialist')
         .order('full_name')
       if (!alive) return
       setPeople((ppl ?? []) as DbPerson[])
@@ -362,11 +360,7 @@ export function DashboardPage() {
         new Map(
           ((pmRows ?? []) as Array<{ subject_id: string | null; subject_name: string }>)
             .filter((r) => !!r.subject_id)
-            .map((r) => {
-              const id = r.subject_id as string
-              const name = peopleById[id]?.full_name ?? r.subject_name
-              return [id, { id, name }]
-            }),
+            .map((r) => [r.subject_id as string, { id: r.subject_id as string, name: r.subject_name }]),
         ).values(),
       ).sort((a, b) => a.name.localeCompare(b.name))
       setPmOptions(nextPmOptions)
@@ -472,7 +466,7 @@ export function DashboardPage() {
         // PM efficiency widget
         const { data: pmEff, error: pmEffErr } = await supabase
           .from('kpi_snapshots')
-          .select('subject_id, subject_name, percentage')
+          .select('subject_name, percentage')
           .eq('period_id', periodId)
           .eq('scope', 'pm')
           .eq('direction', 'all')
@@ -485,11 +479,7 @@ export function DashboardPage() {
         }
         setPmEfficiencyRows(
           ((pmEff ?? []) as any[])
-            .map((r) => {
-              const id = (r.subject_id ?? null) as string | null
-              const name = id ? peopleById[id]?.full_name ?? String(r.subject_name) : String(r.subject_name)
-              return { name, value: Number(r.percentage) }
-            })
+            .map((r) => ({ name: String(r.subject_name), value: Number(r.percentage) }))
             .sort((a, b) => b.value - a.value),
         )
 
@@ -872,13 +862,11 @@ export function DashboardPage() {
                 onChange={(e) => setSpecialistId(e.target.value)}
               >
                 <option value="">Спеціаліст: оберіть…</option>
-                {people
-                  .filter((p) => p.person_type === 'specialist')
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name}
-                    </option>
-                  ))}
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name}{p.is_active ? '' : ' (не працює)'}
+                  </option>
+                ))}
               </select>
             ) : null}
 
@@ -941,7 +929,7 @@ export function DashboardPage() {
             <div>Немає даних для графіка.</div>
             <button
               className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-              onClick={() => navigate('/kpi')}
+              onClick={() => window.location.assign('/kpi')}
             >
               Перейти в KPI і розрахувати
             </button>
@@ -971,7 +959,7 @@ export function DashboardPage() {
               <div>Немає даних. Натисніть “РОЗРАХУВАТИ” у `/kpi` для цього періоду.</div>
               <button
                 className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                onClick={() => navigate('/kpi')}
+                onClick={() => window.location.assign('/kpi')}
               >
                 Перейти в KPI і розрахувати
               </button>
@@ -1005,7 +993,7 @@ export function DashboardPage() {
                 <div>Немає даних. Натисніть “РОЗРАХУВАТИ” у `/kpi` для цього періоду.</div>
                 <button
                   className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                  onClick={() => navigate('/kpi')}
+                  onClick={() => window.location.assign('/kpi')}
                 >
                   Перейти в KPI і розрахувати
                 </button>
@@ -1201,7 +1189,7 @@ export function DashboardPage() {
                         {slicePms.map((r) => (
                           <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
                             <td className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {r.subject_id ? peopleById[r.subject_id]?.full_name ?? r.subject_name : r.subject_name}
+                              {r.subject_name}
                             </td>
                             <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 dark:text-gray-100">
                               {Number(r.percentage).toFixed(1)}%

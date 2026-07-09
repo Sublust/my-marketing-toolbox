@@ -13,6 +13,7 @@ export type DbPerson = {
   full_name: string
   person_type: 'specialist' | 'pm' | 'admin' | 'other'
   is_active: boolean
+  directions: TaskRole[]
 }
 
 export type DbProject = {

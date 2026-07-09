@@ -63,9 +63,6 @@ export function SettingsPage() {
     [users],
   )
 
-  const pmUsers = useMemo(() => users.filter((u) => u.role === 'pm'), [users])
-  const pmUsersById = useMemo(() => Object.fromEntries(pmUsers.map((u) => [u.id, u])), [pmUsers])
-
   const [people, setPeople] = useState<DbPerson[]>([])
   const peopleByName = useMemo(
     () => Object.fromEntries(people.map((p) => [p.full_name.trim().toLowerCase(), p])),
@@ -83,6 +80,11 @@ export function SettingsPage() {
   const [projects, setProjects] = useState<DbProject[]>([])
   const [projectsError, setProjectsError] = useState<string | null>(null)
 
+  const [newSpecName, setNewSpecName] = useState('')
+  const [newSpecDirections, setNewSpecDirections] = useState<TaskRole[]>([])
+  const [specsError, setSpecsError] = useState<string | null>(null)
+  const [isAddingSpec, setIsAddingSpec] = useState(false)
+
   useEffect(() => {
     let alive = true
     const run = async () => {
@@ -98,7 +100,7 @@ export function SettingsPage() {
       const [{ data: cw }, { data: proj }, { data: ppl }] = await Promise.all([
         supabase.from('category_weights').select('category, weight'),
         supabase.from('projects').select('id, name, category, pm_id, pm_name, pm_person_id, is_active').order('name'),
-        supabase.from('people').select('id, full_name, person_type, is_active').order('full_name'),
+        supabase.from('people').select('id, full_name, person_type, is_active, directions').order('full_name'),
       ])
       if (!alive) return
       setWeights(((cw ?? []) as DbCategoryWeight[]).sort((a, b) => a.category.localeCompare(b.category)))
@@ -145,51 +147,70 @@ export function SettingsPage() {
     setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, is_active: !x.is_active } : x)))
   }
 
-  const assignProjectPm = async (args: { projectId: string; pmUserId: string | null }) => {
+  const addSpecialist = async () => {
     if (!isAdmin) return
-    setProjectsError(null)
+    if (!newSpecName.trim()) {
+      setSpecsError("Введіть ім'я спеціаліста.")
+      return
+    }
+    setIsAddingSpec(true)
+    setSpecsError(null)
 
-    const pmUser = args.pmUserId ? pmUsersById[args.pmUserId] ?? null : null
-    const pmName = pmUser?.full_name?.trim() ? pmUser.full_name.trim() : null
+    const { data, error } = await supabase
+      .from('people')
+      .insert({
+        full_name: newSpecName.trim(),
+        person_type: 'specialist',
+        is_active: true,
+        directions: newSpecDirections,
+      })
+      .select('id, full_name, person_type, is_active, directions')
+      .single()
 
-    let pmPersonId: string | null = null
-    if (pmName) {
-      const { error: upErr } = await supabase
-        .from('people')
-        .upsert([{ full_name: pmName, person_type: 'pm', is_active: true }], { onConflict: 'full_name' })
-      if (upErr) {
-        setProjectsError(upErr.message)
-        return
-      }
-
-      const { data: pmPerson, error: pmSelErr } = await supabase
-        .from('people')
-        .select('id')
-        .eq('full_name', pmName)
-        .maybeSingle()
-      if (pmSelErr) {
-        setProjectsError(pmSelErr.message)
-        return
-      }
-      pmPersonId = (pmPerson as any)?.id ?? null
+    setIsAddingSpec(false)
+    if (error) {
+      const msg = error.message.includes('duplicate') || error.message.includes('unique')
+        ? "Спеціаліст з таким ім'ям вже існує."
+        : error.message
+      setSpecsError(msg)
+      return
     }
 
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === args.projectId
-          ? { ...p, pm_id: args.pmUserId, pm_name: pmName, pm_person_id: pmPersonId }
-          : p,
-      ),
-    )
+    if (data) {
+      setPeople((prev) => [...prev, data as DbPerson].sort((a, b) => a.full_name.localeCompare(b.full_name)))
+      setNewSpecName('')
+      setNewSpecDirections([])
+    }
+  }
+
+  const togglePersonActive = async (p: DbPerson) => {
+    setSpecsError(null)
+    const { error } = await supabase
+      .from('people')
+      .update({ is_active: !p.is_active })
+      .eq('id', p.id)
+    if (error) {
+      setSpecsError(error.message)
+      return
+    }
+    setPeople((prev) => prev.map((x) => (x.id === p.id ? { ...x, is_active: !x.is_active } : x)))
+  }
+
+  const togglePersonDirection = async (p: DbPerson, role: TaskRole) => {
+    setSpecsError(null)
+    const newDirections = p.directions.includes(role)
+      ? p.directions.filter((r) => r !== role)
+      : [...p.directions, role]
 
     const { error } = await supabase
-      .from('projects')
-      .update({ pm_id: args.pmUserId, pm_name: pmName, pm_person_id: pmPersonId })
-      .eq('id', args.projectId)
-
+      .from('people')
+      .update({ directions: newDirections })
+      .eq('id', p.id)
     if (error) {
-      setProjectsError(error.message)
+      setSpecsError(error.message)
+      return
     }
+    setPeople((prev) => prev.map((x) => (x.id === p.id ? { ...x, directions: newDirections } : x)))
   }
 
   const createCurrentPeriod = async () => {
@@ -445,7 +466,7 @@ export function SettingsPage() {
 
       const { data: ppl2 } = await supabase
         .from('people')
-        .select('id, full_name, person_type, is_active')
+        .select('id, full_name, person_type, is_active, directions')
         .order('full_name')
       setPeople((ppl2 ?? []) as DbPerson[])
     }
@@ -471,7 +492,7 @@ export function SettingsPage() {
 
       const { data: ppl2 } = await supabase
         .from('people')
-        .select('id, full_name, person_type, is_active')
+        .select('id, full_name, person_type, is_active, directions')
         .order('full_name')
       setPeople((ppl2 ?? []) as DbPerson[])
     }
@@ -733,6 +754,146 @@ export function SettingsPage() {
             </div>
           </div>
 
+          {/* Specialists section */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">Спеціалісти</div>
+            <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Додавання нових спеціалістів, налаштування напрямків роботи та статус активності.
+            </div>
+
+            {specsError ? (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+                {specsError}
+              </div>
+            ) : null}
+
+            {/* Новий спеціаліст */}
+            <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-3">
+                Новий спеціаліст
+              </div>
+              <div className="flex flex-col gap-4 md:flex-row md:items-end">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    ПІБ / Ім'я
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                    placeholder="Наприклад: Олександр"
+                    value={newSpecName}
+                    onChange={(e) => setNewSpecName(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-4 py-2">
+                  {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {
+                    const label = role === 'seo' ? 'SEO' : role === 'context' ? 'Контекст' : role === 'target' ? 'Таргет' : 'TikTok';
+                    return (
+                      <label key={role} className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-blue-600 dark:border-gray-700 dark:bg-gray-900"
+                          checked={newSpecDirections.includes(role)}
+                          onChange={() => {
+                            setNewSpecDirections((prev) =>
+                              prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+                            )
+                          }}
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <button
+                    className="w-full md:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                    onClick={addSpecialist}
+                    disabled={isAddingSpec}
+                  >
+                    Додати спеціаліста
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Список спеціалістів */}
+            <div className="mt-5 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+              <table className="min-w-[640px] w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Спеціаліст</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Напрямки роботи</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Статус</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Дія</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                  {people
+                    .filter((p) => p.person_type === 'specialist')
+                    .map((p) => (
+                      <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{p.full_name}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <div className="flex flex-wrap gap-4">
+                            {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {
+                              const label = role === 'seo' ? 'SEO' : role === 'context' ? 'Контекст' : role === 'target' ? 'Таргет' : 'TikTok';
+                              const hasRole = Array.isArray(p.directions) && p.directions.includes(role);
+                              return (
+                                <label key={role} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-blue-600 dark:border-gray-700 dark:bg-gray-900"
+                                    checked={hasRole}
+                                    onChange={() => void togglePersonDirection(p, role)}
+                                  />
+                                  {label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={[
+                              'inline-flex rounded px-2 py-1 text-xs font-bold',
+                              p.is_active
+                                ? 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300'
+                                : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+                            ].join(' ')}
+                          >
+                            {p.is_active ? 'Працює' : 'Не працює'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            className={[
+                              'rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm hover:opacity-90',
+                              p.is_active
+                                ? 'border-red-200 bg-white text-red-600 dark:border-red-900/60 dark:bg-gray-950 dark:text-red-400'
+                                : 'border-green-200 bg-white text-green-600 dark:border-green-900/60 dark:bg-gray-950 dark:text-green-400',
+                            ].join(' ')}
+                            onClick={() => void togglePersonActive(p)}
+                          >
+                            {p.is_active ? 'Позначити як звільненого' : 'Активувати'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  {people.filter((p) => p.person_type === 'specialist').length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                        Спеціалісти відсутні. Додайте першого спеціаліста вище.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
             <div className="text-sm font-semibold text-gray-900 dark:text-white">Активні проєкти</div>
             <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -746,13 +907,11 @@ export function SettingsPage() {
             ) : null}
 
             <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-              <table className="min-w-[880px] w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <table className="min-w-[720px] w-full divide-y divide-gray-200 dark:divide-gray-800">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Проєкт</th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Кат.</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">PM</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">PM (редагує KPI)</th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Активний</th>
                     <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Дія</th>
                   </tr>
@@ -762,27 +921,6 @@ export function SettingsPage() {
                     <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{p.category}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {p.pm_name?.trim() ? p.pm_name : p.pm_id ? pmUsersById[p.pm_id]?.full_name ?? '—' : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          className="w-full max-w-[240px] rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                          value={p.pm_id ?? ''}
-                          onChange={async (e) => {
-                            const nextId = e.target.value || null
-                            await assignProjectPm({ projectId: p.id, pmUserId: nextId })
-                          }}
-                          title="Виберіть PM, який має право редагувати KPI для цього проєкту"
-                        >
-                          <option value="">—</option>
-                          {pmUsers.map((pm) => (
-                            <option key={pm.id} value={pm.id}>
-                              {pm.full_name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
                       <td className="px-4 py-3 text-sm">
                         <span
                           className={[
