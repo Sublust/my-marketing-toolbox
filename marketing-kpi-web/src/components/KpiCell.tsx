@@ -61,7 +61,7 @@ export function KpiCell(props: {
   }, [props.value.specialistId, props.value.score])
 
   return (
-    <div className="flex w-32 flex-col gap-1.5 lg:w-40">
+    <div className="flex w-full flex-col gap-1.5">
       <select
         className={specialistClass}
         value={props.value.specialistId ?? ''}
