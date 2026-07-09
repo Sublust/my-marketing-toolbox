@@ -32,6 +32,7 @@ export function ResetPasswordPage() {
 
       if (!isMounted) return
 
+      // If link was invalid/expired, Supabase often returns error in hash.
       if (hashError || hashErrorCode) {
         setStatus('error')
         setMessage(
@@ -44,6 +45,7 @@ export function ResetPasswordPage() {
         return
       }
 
+      // We only want to allow this page when it's a recovery flow or when session exists.
       const session = data.session ?? null
       if (!session) {
         setStatus('error')
@@ -59,6 +61,7 @@ export function ResetPasswordPage() {
         return
       }
 
+      // Clean up the hash (so refresh doesn't leak tokens / confuse router).
       if (window.location.hash) {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
       }
@@ -129,9 +132,12 @@ export function ResetPasswordPage() {
 
               setStatus('success')
               setMessage(null)
+
+              // In case user stays here, keep UX clean.
               setPassword('')
               setConfirmPassword('')
 
+              // Optional: route them to login after a short delay.
               setTimeout(() => navigate('/login', { replace: true }), 800)
             }}
           >

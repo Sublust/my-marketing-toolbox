@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabaseClient'
 
@@ -12,7 +12,6 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isRecoverySubmitting, setIsRecoverySubmitting] = useState(false)
   const location = useLocation()
-  const navigate = useNavigate()
 
   const canSubmit = useMemo(
     () => email.trim().length > 3 && password.length >= 6,
@@ -52,7 +51,9 @@ export function LoginPage() {
             }
 
             const from = (location.state as { from?: string } | null)?.from
-            navigate(from || '/kpi', { replace: true })
+            if (from) {
+              window.location.assign(from)
+            }
           }}
         >
           <label className="block">
