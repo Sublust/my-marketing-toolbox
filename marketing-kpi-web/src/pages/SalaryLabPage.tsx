@@ -31,7 +31,7 @@ import {
   DEFAULT_ROLE_THRESHOLDS,
 } from '../domain/salaryEngine'
 import { supabase } from '../lib/supabaseClient'
-import type { DbKpiRecord, DbPeriod, DbPerson, DbProject, ProjectCategory } from '../lib/types'
+import type { DbKpiRecord, DbPeriod, DbPerson, DbProject, ProjectCategory, TaskRole } from '../lib/types'
 
 // Mock reference data from reglament CSVs for realistic testing
 const DEMO_EMPLOYEES: EmployeeInput[] = [
@@ -154,6 +154,7 @@ export function SalaryLabPage() {
   const [categoryWeights, setCategoryWeights] = useState<CategoryWeights>(DEFAULT_CATEGORY_WEIGHTS)
   const [roleThresholds, setRoleThresholds] = useState<RoleThresholds>(DEFAULT_ROLE_THRESHOLDS)
   const [parentProjectMap, setParentProjectMap] = useState<Record<string, string>>(DEFAULT_PARENT_PROJECT_MAP)
+  const [employeeGrades, setEmployeeGrades] = useState<Record<string, EmployeeGrade>>({})
   const [activeViewOption, setActiveViewOption] = useState<'A' | 'B' | 'compare'>('compare')
   const [showConfigPanel, setShowConfigPanel] = useState<boolean>(true)
   const [showParentMappingPanel, setShowParentMappingPanel] = useState<boolean>(false)
@@ -183,7 +184,7 @@ export function SalaryLabPage() {
       if (!period?.id || useDemoData) return
       try {
         const recRes = await supabase.from('kpi_records').select('*').eq('period_id', period.id)
-        if (recRes.data) setKpiRecords(recRes.data)
+        if (recRes.data) setKpiRecords(recRes.data as DbKpiRecord[])
       } catch (err) {
         console.error('Error loading KPI records for period:', err)
       }
@@ -195,7 +196,10 @@ export function SalaryLabPage() {
   // Build employee list from DB or fallback to Demo Data
   const employees: EmployeeInput[] = useMemo(() => {
     if (useDemoData) {
-      return DEMO_EMPLOYEES
+      return DEMO_EMPLOYEES.map((emp) => ({
+        ...emp,
+        grade: employeeGrades[emp.id] || emp.grade,
+      }))
     }
 
     if (projects.length === 0 && people.length === 0) {
@@ -219,7 +223,6 @@ export function SalaryLabPage() {
         const normPm = proj.pm_name.trim().toLowerCase()
         const exact = people.find((p) => p.full_name.trim().toLowerCase() === normPm)
         if (exact) return exact
-        // First name match
         const firstName = normPm.split(' ')[0]
         if (firstName) {
           const partial = people.find(
@@ -231,17 +234,42 @@ export function SalaryLabPage() {
       return null
     }
 
+    // Helper to calculate PM project KPI score from records in this period
+    const getPmProjectKpiScore = (projectId: string): number => {
+      const projRecords = kpiRecords.filter((r) => r.project_id === projectId)
+      if (projRecords.length === 0) return 100 // Default 100% if no scores recorded yet
+
+      let green = 0
+      let yellow = 0
+      let red = 0
+      for (const r of projRecords) {
+        if (r.score === '1') green++
+        else if (r.score === 'ж') yellow++
+        else if (r.score === '0') red++
+      }
+
+      if (green + yellow + red === 0) return 100
+      if (green + yellow >= red) {
+        if (green === 0 && yellow === red) return 50
+        return 100
+      }
+      return 0
+    }
+
     // A) Process PM assignments across ALL active projects in database
     for (const proj of activeProjects) {
       const pmPerson = findPmPerson(proj)
       if (!pmPerson) continue
 
       if (!empMap.has(pmPerson.id)) {
+        let defaultGrade: EmployeeGrade = 'Middle'
+        if (employeeGrades[pmPerson.id]) defaultGrade = employeeGrades[pmPerson.id]
+
         empMap.set(pmPerson.id, {
           id: pmPerson.id,
           name: pmPerson.full_name,
           roleCategory: 'pm',
-          grade: 'Middle',
+          grade: defaultGrade,
           assignments: [],
         })
       }
@@ -249,21 +277,23 @@ export function SalaryLabPage() {
       const pmEmp = empMap.get(pmPerson.id)!
       const exists = pmEmp.assignments.some((a) => a.projectId === proj.id)
       if (!exists) {
+        const pmKpiScore = getPmProjectKpiScore(proj.id)
         pmEmp.assignments.push({
           projectId: proj.id,
           projectName: proj.name,
           clientGroup: proj.name.split(' ')[0],
           category: proj.category as ProjectCategory,
           taskRole: 'seo',
-          score: '1',
+          score: pmKpiScore,
         })
       }
     }
 
-    // B) Process specialist assignments from kpi_records
+    // B) Process specialist assignments from kpi_records or people directions
     for (const rec of kpiRecords) {
-      if (!rec.specialist_id) continue
-      const person = peopleById[rec.specialist_id] || people.find((p) => p.id === rec.specialist_id)
+      const specPersonId = rec.specialist_person_id || rec.specialist_id
+      if (!specPersonId) continue
+      const person = peopleById[specPersonId] || people.find((p) => p.id === specPersonId)
       const proj = projectsById[rec.project_id]
       if (!person || !proj) continue
 
@@ -273,19 +303,23 @@ export function SalaryLabPage() {
         else if (rec.task_role === 'context') roleCategory = 'context'
         else if (person.person_type === 'pm') roleCategory = 'pm'
 
-        // Determine grade if stored or infer
-        let grade: EmployeeGrade = 'Middle'
-        if (person.full_name.toLowerCase().includes('джура') || person.full_name.toLowerCase().includes('харкава') || person.full_name.toLowerCase().includes('мельник')) {
-          grade = 'Junior'
-        } else if (person.full_name.toLowerCase().includes('гула') || person.full_name.toLowerCase().includes('кишко')) {
-          grade = 'Senior'
+        let defaultGrade: EmployeeGrade = 'Middle'
+        if (employeeGrades[person.id]) {
+          defaultGrade = employeeGrades[person.id]
+        } else {
+          const normName = person.full_name.toLowerCase()
+          if (normName.includes('джура') || normName.includes('харкава') || normName.includes('мельник')) {
+            defaultGrade = 'Junior'
+          } else if (normName.includes('гула') || normName.includes('кишко')) {
+            defaultGrade = 'Senior'
+          }
         }
 
         empMap.set(person.id, {
           id: person.id,
           name: person.full_name,
           roleCategory,
-          grade,
+          grade: defaultGrade,
           assignments: [],
         })
       }
@@ -297,14 +331,43 @@ export function SalaryLabPage() {
           projectId: proj.id,
           projectName: proj.name,
           category: proj.category as ProjectCategory,
-          taskRole: rec.task_role,
+          taskRole: rec.task_role as TaskRole,
           score: rec.score,
         })
       }
     }
 
+    // C) Also ensure all specialists from people table are listed
+    for (const person of people) {
+      if (person.person_type === 'specialist' && !empMap.has(person.id)) {
+        let roleCategory: EmployeeRoleCategory = 'seo'
+        if (person.directions?.includes('target') || person.directions?.includes('tiktok')) roleCategory = 'target'
+        else if (person.directions?.includes('context')) roleCategory = 'context'
+
+        let defaultGrade: EmployeeGrade = 'Middle'
+        if (employeeGrades[person.id]) {
+          defaultGrade = employeeGrades[person.id]
+        } else {
+          const normName = person.full_name.toLowerCase()
+          if (normName.includes('джура') || normName.includes('харкава') || normName.includes('мельник')) {
+            defaultGrade = 'Junior'
+          } else if (normName.includes('гула') || normName.includes('кишко')) {
+            defaultGrade = 'Senior'
+          }
+        }
+
+        empMap.set(person.id, {
+          id: person.id,
+          name: person.full_name,
+          roleCategory,
+          grade: defaultGrade,
+          assignments: [],
+        })
+      }
+    }
+
     return Array.from(empMap.values())
-  }, [useDemoData, kpiRecords, people, projects])
+  }, [useDemoData, kpiRecords, people, projects, employeeGrades])
 
   // Collect ALL unique active projects in database (or demo projects)
   const allUniqueProjects = useMemo(() => {
@@ -318,7 +381,6 @@ export function SalaryLabPage() {
         }))
     }
 
-    // Fallback/Demo map
     const map = new Map<string, { id: string; name: string; category: ProjectCategory }>()
     for (const emp of employees) {
       for (const ast of emp.assignments) {
@@ -372,6 +434,7 @@ export function SalaryLabPage() {
     setCategoryWeights(DEFAULT_CATEGORY_WEIGHTS)
     setRoleThresholds(DEFAULT_ROLE_THRESHOLDS)
     setParentProjectMap(DEFAULT_PARENT_PROJECT_MAP)
+    setEmployeeGrades({})
   }
 
   return (
@@ -389,7 +452,7 @@ export function SalaryLabPage() {
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Моделювання та випробування нових регламентів нарахування заробітної плати з можливості ручного коригування коефіцієнтів, меж навантаження та зв'язків проєктів.
+              Моделювання та випробування нових регламентів нарахування заробітної плати з можливості ручного коригування грейдів, коефіцієнтів та меж навантаження.
             </p>
           </div>
 
@@ -406,7 +469,7 @@ export function SalaryLabPage() {
               title="Перемкнути між даними регламенту та реальними проєктами з бази"
             >
               {useDemoData ? <FileSpreadsheet className="h-4 w-4" /> : <Database className="h-4 w-4" />}
-              {useDemoData ? 'Тестовий регламент' : `Реальні проєкти з БД (${projects.length})`}
+              {useDemoData ? 'Тестовий регламент' : `Реальні дані БД (${projects.length} проєктів)`}
             </button>
           </div>
         </div>
@@ -738,7 +801,7 @@ export function SalaryLabPage() {
               Детальний розрахунок по працівниках ({employees.length} осіб)
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Натисніть на рядок працівника, щоб розгорнути деталізацію проєктів
+              Оберіть Грейд працівника (Junior/Middle/Senior) або натисніть на рядок, щоб розгорнути деталізацію
             </p>
           </div>
         </div>
@@ -748,8 +811,8 @@ export function SalaryLabPage() {
             <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 font-semibold uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left w-48">Співробітник</th>
-                <th className="px-3 py-3 text-left w-36">Грейд / Роль</th>
-                <th className="px-3 py-3 text-center w-36">Бали навантаження</th>
+                <th className="px-3 py-3 text-left w-44">Грейд / Роль</th>
+                <th className="px-3 py-3 text-center w-32">Бали навантаження</th>
                 <th className="px-3 py-3 text-center w-24">Рівень</th>
                 <th className="px-3 py-3 text-right w-20">Ставка</th>
                 <th className="px-3 py-3 text-right w-24">Проєктна ч.</th>
@@ -781,17 +844,29 @@ export function SalaryLabPage() {
                         <span className="truncate">{empA.name}</span>
                       </td>
 
-                      <td className="px-3 py-3.5">
+                      <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                            empA.grade === 'Senior'
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
-                              : empA.grade === 'Middle'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                          }`}>
-                            {empA.grade}
-                          </span>
+                          <select
+                            value={empA.grade}
+                            onChange={(e) => {
+                              const newGrade = e.target.value as EmployeeGrade
+                              setEmployeeGrades((prev) => ({
+                                ...prev,
+                                [empA.id]: newGrade,
+                              }))
+                            }}
+                            className={`rounded border px-1.5 py-0.5 text-[11px] font-bold shadow-sm transition-colors cursor-pointer dark:bg-gray-900 ${
+                              empA.grade === 'Senior'
+                                ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-800 dark:text-purple-300'
+                                : empA.grade === 'Middle'
+                                ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:text-blue-300'
+                                : 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300'
+                            }`}
+                          >
+                            <option value="Junior">Junior</option>
+                            <option value="Middle">Middle</option>
+                            <option value="Senior">Senior</option>
+                          </select>
                           <span className="text-[11px] text-gray-500 uppercase">{empA.roleCategory}</span>
                         </div>
                       </td>
