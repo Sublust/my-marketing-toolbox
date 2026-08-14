@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Calculator,
   ChevronDown,
@@ -558,18 +558,18 @@ export function SalaryLabPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs table-fixed min-w-[760px]">
             <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 font-semibold uppercase tracking-wider">
               <tr>
-                <th className="px-4 py-3">Співробітник</th>
-                <th className="px-3 py-3">Грейд / Роль</th>
-                <th className="px-3 py-3 text-center">Бали навантаження</th>
-                <th className="px-3 py-3 text-center">Рівень</th>
-                <th className="px-3 py-3 text-right">Ставка</th>
-                <th className="px-3 py-3 text-right">Проєктна ч.</th>
-                <th className="px-3 py-3 text-right">KPI Бонус</th>
-                <th className="px-4 py-3 text-right font-bold">Разом ЗП</th>
-                {activeViewOption === 'compare' && <th className="px-4 py-3 text-right">Різниця (B - A)</th>}
+                <th className="px-4 py-3 text-left w-48">Співробітник</th>
+                <th className="px-3 py-3 text-left w-36">Грейд / Роль</th>
+                <th className="px-3 py-3 text-center w-36">Бали навантаження</th>
+                <th className="px-3 py-3 text-center w-24">Рівень</th>
+                <th className="px-3 py-3 text-right w-20">Ставка</th>
+                <th className="px-3 py-3 text-right w-24">Проєктна ч.</th>
+                <th className="px-3 py-3 text-right w-24">KPI Бонус</th>
+                <th className="px-4 py-3 text-right w-28 font-bold">Разом ЗП</th>
+                {activeViewOption === 'compare' && <th className="px-4 py-3 text-right w-32">Різниця (B - A)</th>}
               </tr>
             </thead>
 
@@ -581,18 +581,18 @@ export function SalaryLabPage() {
                 const diffVal = Math.round((empB.totalSalary - empA.totalSalary) * 100) / 100
 
                 return (
-                  <tbody key={empA.id} className="group">
+                  <Fragment key={empA.id}>
                     <tr
                       onClick={() => setExpandedEmployeeId(isExpanded ? null : empA.id)}
                       className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                     >
-                      <td className="px-4 py-3.5 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <td className="px-4 py-3.5 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2 truncate">
                         {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
                         ) : (
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
                         )}
-                        <span>{empA.name}</span>
+                        <span className="truncate">{empA.name}</span>
                       </td>
 
                       <td className="px-3 py-3.5">
@@ -734,7 +734,7 @@ export function SalaryLabPage() {
                         </td>
                       </tr>
                     )}
-                  </tbody>
+                  </Fragment>
                 )
               })}
             </tbody>
