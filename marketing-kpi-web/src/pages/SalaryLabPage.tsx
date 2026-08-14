@@ -31,7 +31,7 @@ import {
   DEFAULT_ROLE_THRESHOLDS,
 } from '../domain/salaryEngine'
 import { supabase } from '../lib/supabaseClient'
-import type { DbKpiRecord, DbPeriod, DbPerson, DbProject, ProjectCategory, TaskRole } from '../lib/types'
+import type { DbKpiRecord, DbPeriod, DbPerson, DbProject, DbUserProfile, ProjectCategory, TaskRole } from '../lib/types'
 
 // Mock reference data from reglament CSVs for realistic testing
 const DEMO_EMPLOYEES: EmployeeInput[] = [
@@ -148,6 +148,7 @@ export function SalaryLabPage() {
   // Real DB state
   const [projects, setProjects] = useState<DbProject[]>([])
   const [people, setPeople] = useState<DbPerson[]>([])
+  const [users, setUsers] = useState<DbUserProfile[]>([])
   const [kpiRecords, setKpiRecords] = useState<DbKpiRecord[]>([])
 
   // Dynamic configuration controls
@@ -160,25 +161,27 @@ export function SalaryLabPage() {
   const [showParentMappingPanel, setShowParentMappingPanel] = useState<boolean>(false)
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null)
 
-  // Load all projects and people on initial mount
+  // Load all projects, people, and users on initial mount
   useEffect(() => {
     async function initDbData() {
       try {
-        const [projRes, peopleRes] = await Promise.all([
+        const [projRes, peopleRes, usersRes] = await Promise.all([
           supabase.from('projects').select('*').order('name'),
           supabase.from('people').select('*').order('full_name'),
+          supabase.from('users').select('*'),
         ])
         if (projRes.data) setProjects(projRes.data)
         if (peopleRes.data) setPeople(peopleRes.data)
+        if (usersRes.data) setUsers(usersRes.data as DbUserProfile[])
       } catch (err) {
-        console.error('Error initializing database projects/people:', err)
+        console.error('Error initializing database projects/people/users:', err)
       }
     }
 
     initDbData()
   }, [])
 
-  // Load database records and snapshots for current period
+  // Load database KPI records for current period
   useEffect(() => {
     async function loadPeriodData() {
       if (!period?.id || useDemoData) return
@@ -209,11 +212,35 @@ export function SalaryLabPage() {
     // Filter STRICTLY ACTIVE employees (is_active !== false)
     const activePeople = people.filter((p) => p.is_active !== false)
     const peopleById = Object.fromEntries(activePeople.map((p) => [p.id, p]))
+    const usersById = Object.fromEntries(users.map((u) => [u.id, u]))
 
+    // Include ALL projects (active & historical for the period) so no project is dropped
+    const projectsById = Object.fromEntries(projects.map((pr) => [pr.id, pr]))
     const activeProjects = projects.filter((p) => p.is_active !== false)
-    const projectsById = Object.fromEntries(activeProjects.map((pr) => [pr.id, pr]))
 
     const empMap = new Map<string, EmployeeInput>()
+
+    // Helper to resolve specialist person from kpi_record via specialist_person_id OR specialist_id OR user lookup
+    const findSpecialistPerson = (rec: DbKpiRecord): DbPerson | null => {
+      if (rec.specialist_person_id && peopleById[rec.specialist_person_id]) {
+        return peopleById[rec.specialist_person_id]
+      }
+      if (rec.specialist_id) {
+        if (peopleById[rec.specialist_id]) return peopleById[rec.specialist_id]
+        const userObj = usersById[rec.specialist_id]
+        if (userObj?.full_name) {
+          const normU = userObj.full_name.trim().toLowerCase()
+          const matchedPerson = activePeople.find((p) => p.full_name.trim().toLowerCase() === normU)
+          if (matchedPerson) return matchedPerson
+          const firstU = normU.split(' ')[0]
+          if (firstU) {
+            const partial = activePeople.find((p) => p.full_name.trim().toLowerCase().includes(firstU))
+            if (partial) return partial
+          }
+        }
+      }
+      return null
+    }
 
     // Helper to find matching ACTIVE PM person in people list
     const findPmPerson = (proj: DbProject): DbPerson | null => {
@@ -234,10 +261,10 @@ export function SalaryLabPage() {
       return null
     }
 
-    // Helper to calculate PM project KPI score from records in this period
+    // Helper to calculate PM project KPI score from records in this period based on actual role scores
     const getPmProjectKpiScore = (projectId: string): number => {
       const projRecords = kpiRecords.filter((r) => r.project_id === projectId)
-      if (projRecords.length === 0) return 100 // Default 100% if no scores recorded yet
+      if (projRecords.length === 0) return 100
 
       let green = 0
       let yellow = 0
@@ -249,11 +276,11 @@ export function SalaryLabPage() {
       }
 
       if (green + yellow + red === 0) return 100
-      if (green + yellow >= red) {
-        if (green === 0 && yellow === red) return 50
-        return 100
-      }
-      return 0
+      if (red > 0 && green === 0 && yellow === 0) return 0
+      if (red > green + yellow) return 0
+      if (yellow > 0 && green === 0) return 80
+      if (green > 0) return 100
+      return 50
     }
 
     // A) Process PM assignments across ALL active projects in database
@@ -291,9 +318,7 @@ export function SalaryLabPage() {
 
     // B) Process specialist assignments from kpi_records (ONLY ACTIVE WORKING EMPLOYEES)
     for (const rec of kpiRecords) {
-      const specPersonId = rec.specialist_person_id || rec.specialist_id
-      if (!specPersonId) continue
-      const person = peopleById[specPersonId] // Only matches active people
+      const person = findSpecialistPerson(rec)
       const proj = projectsById[rec.project_id]
       if (!person || !proj) continue
 
@@ -367,7 +392,7 @@ export function SalaryLabPage() {
     }
 
     return Array.from(empMap.values())
-  }, [useDemoData, kpiRecords, people, projects, employeeGrades])
+  }, [useDemoData, kpiRecords, people, projects, users, employeeGrades])
 
   // Collect ALL unique active projects in database (or demo projects)
   const allUniqueProjects = useMemo(() => {
@@ -452,7 +477,7 @@ export function SalaryLabPage() {
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Моделювання та випробування нових регламентів нарахування заробітної плати для діючих працівників з можливістю ручного коригування грейдів, коефіцієнтів та меж навантаження.
+              Моделювання та випробування нових регламентів нарахування заробітної плати для діючих працівників з можливості ручного коригування грейдів, коефіцієнтів та меж навантаження.
             </p>
           </div>
 
@@ -992,7 +1017,7 @@ export function SalaryLabPage() {
                                         {det.scorePercent}% ({det.payoutPercent * 100}% виплати)
                                       </span>
                                     </td>
-                                    <td className="py-2 text-right font-mono text-gray-600 dark:text-gray-400">
+                                    <td className="py-2 text-center text-gray-600 dark:text-gray-400 font-mono">
                                       {det.allocatedKpiBudget}
                                     </td>
                                     <td className="py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
