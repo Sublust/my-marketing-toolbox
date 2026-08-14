@@ -18,6 +18,7 @@ import {
 import { PeriodPicker } from '../components/PeriodPicker'
 import type {
   CategoryWeights,
+  EmployeeGrade,
   EmployeeInput,
   EmployeeRoleCategory,
   RoleThresholds,
@@ -130,7 +131,7 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
   },
 ]
 
-// Default parent project relationships mapping for demo data
+// Default parent project relationships mapping
 const DEFAULT_PARENT_PROJECT_MAP: Record<string, string> = {
   'Соларей': 'HealthFit',
   'Майнд Ші': 'HealthFit',
@@ -142,7 +143,7 @@ const DEFAULT_PARENT_PROJECT_MAP: Record<string, string> = {
 
 export function SalaryLabPage() {
   const [period, setPeriod] = useState<DbPeriod | null>(null)
-  const [useDemoData, setUseDemoData] = useState<boolean>(true)
+  const [useDemoData, setUseDemoData] = useState<boolean>(false)
 
   // Real DB state
   const [projects, setProjects] = useState<DbProject[]>([])
@@ -158,22 +159,33 @@ export function SalaryLabPage() {
   const [showParentMappingPanel, setShowParentMappingPanel] = useState<boolean>(false)
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null)
 
+  // Load all projects and people on initial mount
+  useEffect(() => {
+    async function initDbData() {
+      try {
+        const [projRes, peopleRes] = await Promise.all([
+          supabase.from('projects').select('*').order('name'),
+          supabase.from('people').select('*').order('full_name'),
+        ])
+        if (projRes.data) setProjects(projRes.data)
+        if (peopleRes.data) setPeople(peopleRes.data)
+      } catch (err) {
+        console.error('Error initializing database projects/people:', err)
+      }
+    }
+
+    initDbData()
+  }, [])
+
   // Load database records for current period
   useEffect(() => {
     async function loadPeriodData() {
       if (!period?.id || useDemoData) return
       try {
-        const [projRes, peopleRes, recRes] = await Promise.all([
-          supabase.from('projects').select('*'),
-          supabase.from('people').select('*'),
-          supabase.from('kpi_records').select('*').eq('period_id', period.id),
-        ])
-
-        if (projRes.data) setProjects(projRes.data)
-        if (peopleRes.data) setPeople(peopleRes.data)
+        const recRes = await supabase.from('kpi_records').select('*').eq('period_id', period.id)
         if (recRes.data) setKpiRecords(recRes.data)
       } catch (err) {
-        console.error('Error loading data for period:', err)
+        console.error('Error loading KPI records for period:', err)
       }
     }
 
@@ -182,49 +194,46 @@ export function SalaryLabPage() {
 
   // Build employee list from DB or fallback to Demo Data
   const employees: EmployeeInput[] = useMemo(() => {
-    if (useDemoData || kpiRecords.length === 0) {
+    if (useDemoData) {
+      return DEMO_EMPLOYEES
+    }
+
+    if (projects.length === 0 && people.length === 0) {
       return DEMO_EMPLOYEES
     }
 
     const peopleById = Object.fromEntries(people.map((p) => [p.id, p]))
-    const projectsById = Object.fromEntries(projects.map((pr) => [pr.id, pr]))
+    const activeProjects = projects.filter((p) => p.is_active)
+    const projectsById = Object.fromEntries(activeProjects.map((pr) => [pr.id, pr]))
 
     const empMap = new Map<string, EmployeeInput>()
 
-    for (const rec of kpiRecords) {
-      if (!rec.specialist_id) continue
-      const person = peopleById[rec.specialist_id]
-      const proj = projectsById[rec.project_id]
-      if (!person || !proj) continue
-
-      if (!empMap.has(person.id)) {
-        let roleCategory: EmployeeRoleCategory = 'seo'
-        if (rec.task_role === 'target' || rec.task_role === 'tiktok') roleCategory = 'target'
-        else if (rec.task_role === 'context') roleCategory = 'context'
-        else if (person.person_type === 'pm') roleCategory = 'pm'
-
-        empMap.set(person.id, {
-          id: person.id,
-          name: person.full_name,
-          roleCategory,
-          grade: 'Middle',
-          assignments: [],
-        })
+    // Helper to find matching PM person in people list
+    const findPmPerson = (proj: DbProject): DbPerson | null => {
+      if (proj.pm_person_id && peopleById[proj.pm_person_id]) return peopleById[proj.pm_person_id]
+      if (proj.pm_id) {
+        const byId = peopleById[proj.pm_id] || people.find((p) => p.id === proj.pm_id)
+        if (byId) return byId
       }
-
-      const emp = empMap.get(person.id)!
-      emp.assignments.push({
-        projectId: proj.id,
-        projectName: proj.name,
-        category: proj.category as ProjectCategory,
-        taskRole: rec.task_role,
-        score: rec.score,
-      })
+      if (proj.pm_name) {
+        const normPm = proj.pm_name.trim().toLowerCase()
+        const exact = people.find((p) => p.full_name.trim().toLowerCase() === normPm)
+        if (exact) return exact
+        // First name match
+        const firstName = normPm.split(' ')[0]
+        if (firstName) {
+          const partial = people.find(
+            (p) => p.person_type === 'pm' && p.full_name.trim().toLowerCase().includes(firstName),
+          )
+          if (partial) return partial
+        }
+      }
+      return null
     }
 
-    for (const proj of projects) {
-      if (!proj.pm_id) continue
-      const pmPerson = peopleById[proj.pm_id]
+    // A) Process PM assignments across ALL active projects in database
+    for (const proj of activeProjects) {
+      const pmPerson = findPmPerson(proj)
       if (!pmPerson) continue
 
       if (!empMap.has(pmPerson.id)) {
@@ -243,6 +252,7 @@ export function SalaryLabPage() {
         pmEmp.assignments.push({
           projectId: proj.id,
           projectName: proj.name,
+          clientGroup: proj.name.split(' ')[0],
           category: proj.category as ProjectCategory,
           taskRole: 'seo',
           score: '1',
@@ -250,11 +260,65 @@ export function SalaryLabPage() {
       }
     }
 
+    // B) Process specialist assignments from kpi_records
+    for (const rec of kpiRecords) {
+      if (!rec.specialist_id) continue
+      const person = peopleById[rec.specialist_id] || people.find((p) => p.id === rec.specialist_id)
+      const proj = projectsById[rec.project_id]
+      if (!person || !proj) continue
+
+      if (!empMap.has(person.id)) {
+        let roleCategory: EmployeeRoleCategory = 'seo'
+        if (rec.task_role === 'target' || rec.task_role === 'tiktok') roleCategory = 'target'
+        else if (rec.task_role === 'context') roleCategory = 'context'
+        else if (person.person_type === 'pm') roleCategory = 'pm'
+
+        // Determine grade if stored or infer
+        let grade: EmployeeGrade = 'Middle'
+        if (person.full_name.toLowerCase().includes('джура') || person.full_name.toLowerCase().includes('харкава') || person.full_name.toLowerCase().includes('мельник')) {
+          grade = 'Junior'
+        } else if (person.full_name.toLowerCase().includes('гула') || person.full_name.toLowerCase().includes('кишко')) {
+          grade = 'Senior'
+        }
+
+        empMap.set(person.id, {
+          id: person.id,
+          name: person.full_name,
+          roleCategory,
+          grade,
+          assignments: [],
+        })
+      }
+
+      const emp = empMap.get(person.id)!
+      const exists = emp.assignments.some((a) => a.projectId === proj.id && a.taskRole === rec.task_role)
+      if (!exists) {
+        emp.assignments.push({
+          projectId: proj.id,
+          projectName: proj.name,
+          category: proj.category as ProjectCategory,
+          taskRole: rec.task_role,
+          score: rec.score,
+        })
+      }
+    }
+
     return Array.from(empMap.values())
   }, [useDemoData, kpiRecords, people, projects])
 
-  // Collect unique projects across all assignments
+  // Collect ALL unique active projects in database (or demo projects)
   const allUniqueProjects = useMemo(() => {
+    if (!useDemoData && projects.length > 0) {
+      return projects
+        .filter((p) => p.is_active)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: (p.category ?? 'B') as ProjectCategory,
+        }))
+    }
+
+    // Fallback/Demo map
     const map = new Map<string, { id: string; name: string; category: ProjectCategory }>()
     for (const emp of employees) {
       for (const ast of emp.assignments) {
@@ -265,7 +329,7 @@ export function SalaryLabPage() {
       }
     }
     return Array.from(map.values())
-  }, [employees])
+  }, [useDemoData, projects, employees])
 
   // Calculate results for Option A & Option B under current config
   const calculatedData = useMemo(() => {
@@ -339,10 +403,10 @@ export function SalaryLabPage() {
                   ? 'bg-purple-600 text-white hover:bg-purple-700'
                   : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
               }`}
-              title="Перемкнути між даними регламенту та реальними KPI з бази"
+              title="Перемкнути між даними регламенту та реальними проєктами з бази"
             >
               {useDemoData ? <FileSpreadsheet className="h-4 w-4" /> : <Database className="h-4 w-4" />}
-              {useDemoData ? 'Тестовий регламент' : 'Дані з БД'}
+              {useDemoData ? 'Тестовий регламент' : `Реальні проєкти з БД (${projects.length})`}
             </button>
           </div>
         </div>
@@ -505,7 +569,7 @@ export function SalaryLabPage() {
                 className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300 transition-colors"
               >
                 <GitFork className="h-4 w-4" />
-                {showParentMappingPanel ? 'Сховати зв\'язки проєктів' : 'Налаштувати материнські проєкти'}
+                {showParentMappingPanel ? 'Сховати зв\'язки проєктів' : `Налаштувати материнські проєкти (${allUniqueProjects.length})`}
               </button>
             </div>
           </div>
@@ -519,7 +583,7 @@ export function SalaryLabPage() {
             <div>
               <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <GitFork className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                Зв'язки проєктів та материнські проєкти (для дисконту 50% у Варіанті B)
+                Зв'язки проєктів та материнські проєкти (Всього {allUniqueProjects.length} проєктів)
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Вкажіть материнський/головний проєкт або клієнтську групу для кожного напрямку чи додаткового проєкту одного клієнта.
@@ -527,9 +591,9 @@ export function SalaryLabPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 font-semibold uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-2.5">Проєкт / Напрямок</th>
                   <th className="px-3 py-2.5">Категорія</th>
@@ -671,7 +735,7 @@ export function SalaryLabPage() {
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Детальний розрахунок по працівниках
+              Детальний розрахунок по працівниках ({employees.length} осіб)
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Натисніть на рядок працівника, щоб розгорнути деталізацію проєктів
@@ -791,7 +855,7 @@ export function SalaryLabPage() {
                         <td colSpan={activeViewOption === 'compare' ? 9 : 8} className="bg-gray-50/80 p-4 dark:bg-gray-950/60">
                           <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-inner dark:border-gray-800 dark:bg-gray-900">
                             <div className="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300">
-                              <span>Закріплені проєкти та розрахований KPI бонус ({activeEmp.name})</span>
+                              <span>Закріплені проєкти та розрахований KPI бонус ({activeEmp.name}) — всього {activeEmp.projectDetails.length} проєктів</span>
                               <span className="text-gray-400">Максимальний KPI бюджет: {activeEmp.maxKpiBudget} грн</span>
                             </div>
 
