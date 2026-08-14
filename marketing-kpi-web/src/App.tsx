@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AdminRoute } from './components/AdminRoute'
 import { AppShell } from './components/AppShell'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
@@ -26,6 +27,11 @@ const DashboardPage = lazy(async () => {
 const SettingsPage = lazy(async () => {
   const mod = await import('./pages/SettingsPage')
   return { default: mod.SettingsPage }
+})
+
+const SalaryLabPage = lazy(async () => {
+  const mod = await import('./pages/SalaryLabPage')
+  return { default: mod.SalaryLabPage }
 })
 
 export default function App() {
@@ -62,6 +68,10 @@ export default function App() {
             <Route path="/kpi" element={<KpiEntryPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+
+            <Route element={<AdminRoute />}>
+              <Route path="/salary-lab" element={<SalaryLabPage />} />
+            </Route>
           </Route>
         </Route>
 

@@ -49,6 +49,9 @@ export function AppShell() {
               <NavItem to="/kpi">KPI</NavItem>
               <NavItem to="/dashboard">Dashboard</NavItem>
               <NavItem to="/settings">Settings</NavItem>
+              {profile?.role === 'admin' && (
+                <NavItem to="/salary-lab">Експеримент ЗП</NavItem>
+              )}
             </nav>
 
             <div className="hidden sm:flex items-center gap-2">
