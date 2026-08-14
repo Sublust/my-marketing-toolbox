@@ -178,7 +178,7 @@ export function SalaryLabPage() {
     initDbData()
   }, [])
 
-  // Load database records for current period
+  // Load database records and snapshots for current period
   useEffect(() => {
     async function loadPeriodData() {
       if (!period?.id || useDemoData) return
@@ -193,7 +193,7 @@ export function SalaryLabPage() {
     loadPeriodData()
   }, [period, useDemoData])
 
-  // Build employee list from DB or fallback to Demo Data
+  // Build employee list from DB (STRICTLY ACTIVE WORKING EMPLOYEES) or fallback to Demo Data
   const employees: EmployeeInput[] = useMemo(() => {
     if (useDemoData) {
       return DEMO_EMPLOYEES.map((emp) => ({
@@ -206,26 +206,26 @@ export function SalaryLabPage() {
       return DEMO_EMPLOYEES
     }
 
-    const peopleById = Object.fromEntries(people.map((p) => [p.id, p]))
-    const activeProjects = projects.filter((p) => p.is_active)
+    // Filter STRICTLY ACTIVE employees (is_active !== false)
+    const activePeople = people.filter((p) => p.is_active !== false)
+    const peopleById = Object.fromEntries(activePeople.map((p) => [p.id, p]))
+
+    const activeProjects = projects.filter((p) => p.is_active !== false)
     const projectsById = Object.fromEntries(activeProjects.map((pr) => [pr.id, pr]))
 
     const empMap = new Map<string, EmployeeInput>()
 
-    // Helper to find matching PM person in people list
+    // Helper to find matching ACTIVE PM person in people list
     const findPmPerson = (proj: DbProject): DbPerson | null => {
       if (proj.pm_person_id && peopleById[proj.pm_person_id]) return peopleById[proj.pm_person_id]
-      if (proj.pm_id) {
-        const byId = peopleById[proj.pm_id] || people.find((p) => p.id === proj.pm_id)
-        if (byId) return byId
-      }
+      if (proj.pm_id && peopleById[proj.pm_id]) return peopleById[proj.pm_id]
       if (proj.pm_name) {
         const normPm = proj.pm_name.trim().toLowerCase()
-        const exact = people.find((p) => p.full_name.trim().toLowerCase() === normPm)
+        const exact = activePeople.find((p) => p.full_name.trim().toLowerCase() === normPm)
         if (exact) return exact
         const firstName = normPm.split(' ')[0]
         if (firstName) {
-          const partial = people.find(
+          const partial = activePeople.find(
             (p) => p.person_type === 'pm' && p.full_name.trim().toLowerCase().includes(firstName),
           )
           if (partial) return partial
@@ -289,11 +289,11 @@ export function SalaryLabPage() {
       }
     }
 
-    // B) Process specialist assignments from kpi_records or people directions
+    // B) Process specialist assignments from kpi_records (ONLY ACTIVE WORKING EMPLOYEES)
     for (const rec of kpiRecords) {
       const specPersonId = rec.specialist_person_id || rec.specialist_id
       if (!specPersonId) continue
-      const person = peopleById[specPersonId] || people.find((p) => p.id === specPersonId)
+      const person = peopleById[specPersonId] // Only matches active people
       const proj = projectsById[rec.project_id]
       if (!person || !proj) continue
 
@@ -337,8 +337,8 @@ export function SalaryLabPage() {
       }
     }
 
-    // C) Also ensure all specialists from people table are listed
-    for (const person of people) {
+    // C) Also ensure all active specialists from people table are listed
+    for (const person of activePeople) {
       if (person.person_type === 'specialist' && !empMap.has(person.id)) {
         let roleCategory: EmployeeRoleCategory = 'seo'
         if (person.directions?.includes('target') || person.directions?.includes('tiktok')) roleCategory = 'target'
@@ -373,7 +373,7 @@ export function SalaryLabPage() {
   const allUniqueProjects = useMemo(() => {
     if (!useDemoData && projects.length > 0) {
       return projects
-        .filter((p) => p.is_active)
+        .filter((p) => p.is_active !== false)
         .map((p) => ({
           id: p.id,
           name: p.name,
@@ -452,7 +452,7 @@ export function SalaryLabPage() {
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Моделювання та випробування нових регламентів нарахування заробітної плати з можливості ручного коригування грейдів, коефіцієнтів та меж навантаження.
+              Моделювання та випробування нових регламентів нарахування заробітної плати для діючих працівників з можливістю ручного коригування грейдів, коефіцієнтів та меж навантаження.
             </p>
           </div>
 
@@ -469,7 +469,7 @@ export function SalaryLabPage() {
               title="Перемкнути між даними регламенту та реальними проєктами з бази"
             >
               {useDemoData ? <FileSpreadsheet className="h-4 w-4" /> : <Database className="h-4 w-4" />}
-              {useDemoData ? 'Тестовий регламент' : `Реальні дані БД (${projects.length} проєктів)`}
+              {useDemoData ? 'Тестовий регламент' : `Реальні дані БД (${employees.length} працюючих)`}
             </button>
           </div>
         </div>
@@ -781,7 +781,7 @@ export function SalaryLabPage() {
         {/* Card 4: Total Employees */}
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Всього працівників</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Всього працюючих</span>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
               <Users className="h-4 w-4" />
             </div>
@@ -789,7 +789,7 @@ export function SalaryLabPage() {
           <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-50">
             {employees.length} <span className="text-xs font-normal text-gray-500">осіб</span>
           </div>
-          <p className="mt-1 text-[11px] text-gray-400">Враховано у симуляції</p>
+          <p className="mt-1 text-[11px] text-gray-400">Активні співробітники</p>
         </div>
       </div>
 
@@ -798,7 +798,7 @@ export function SalaryLabPage() {
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Детальний розрахунок по працівниках ({employees.length} осіб)
+              Детальний розрахунок по працюючих працівниках ({employees.length} осіб)
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Оберіть Грейд працівника (Junior/Middle/Senior) або натисніть на рядок, щоб розгорнути деталізацію
