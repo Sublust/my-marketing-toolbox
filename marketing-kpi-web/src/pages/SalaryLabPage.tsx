@@ -150,6 +150,7 @@ export function SalaryLabPage() {
   const [people, setPeople] = useState<DbPerson[]>([])
   const [users, setUsers] = useState<DbUserProfile[]>([])
   const [kpiRecords, setKpiRecords] = useState<DbKpiRecord[]>([])
+  const [allKpiRecords, setAllKpiRecords] = useState<DbKpiRecord[]>([])
 
   // Dynamic configuration controls
   const [categoryWeights, setCategoryWeights] = useState<CategoryWeights>(DEFAULT_CATEGORY_WEIGHTS)
@@ -161,18 +162,20 @@ export function SalaryLabPage() {
   const [showParentMappingPanel, setShowParentMappingPanel] = useState<boolean>(false)
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null)
 
-  // Load all projects, people, and users on initial mount
+  // Load all projects, people, users, and overall kpi_records on initial mount
   useEffect(() => {
     async function initDbData() {
       try {
-        const [projRes, peopleRes, usersRes] = await Promise.all([
+        const [projRes, peopleRes, usersRes, allRecsRes] = await Promise.all([
           supabase.from('projects').select('*').order('name'),
           supabase.from('people').select('*').order('full_name'),
           supabase.from('users').select('*'),
+          supabase.from('kpi_records').select('*'),
         ])
         if (projRes.data) setProjects(projRes.data)
         if (peopleRes.data) setPeople(peopleRes.data)
         if (usersRes.data) setUsers(usersRes.data as DbUserProfile[])
+        if (allRecsRes.data) setAllKpiRecords(allRecsRes.data as DbKpiRecord[])
       } catch (err) {
         console.error('Error initializing database projects/people/users:', err)
       }
@@ -181,7 +184,39 @@ export function SalaryLabPage() {
     initDbData()
   }, [])
 
-  // Load database KPI records for current period
+  // Auto-initialize latest period if period is null
+  useEffect(() => {
+    async function initLatestPeriod() {
+      if (period) return
+      try {
+        const { data: openP } = await supabase
+          .from('periods')
+          .select('*')
+          .eq('is_closed', false)
+          .order('year', { ascending: false })
+          .order('month', { ascending: false })
+          .limit(1)
+
+        const { data: anyP } = !openP?.length
+          ? await supabase
+              .from('periods')
+              .select('*')
+              .order('year', { ascending: false })
+              .order('month', { ascending: false })
+              .limit(1)
+          : { data: null }
+
+        const latest = (openP?.[0] ?? anyP?.[0]) as DbPeriod | undefined
+        if (latest) setPeriod(latest)
+      } catch (err) {
+        console.error('Error fetching latest period for Salary Lab:', err)
+      }
+    }
+
+    initLatestPeriod()
+  }, [period])
+
+  // Load database KPI records for selected period
   useEffect(() => {
     async function loadPeriodData() {
       if (!period?.id || useDemoData) return
@@ -214,13 +249,28 @@ export function SalaryLabPage() {
     const peopleById = Object.fromEntries(activePeople.map((p) => [p.id, p]))
     const usersById = Object.fromEntries(users.map((u) => [u.id, u]))
 
-    // Include ALL projects (active & historical for the period) so no project is dropped
+    // Include ALL projects (active & historical for the period)
     const projectsById = Object.fromEntries(projects.map((pr) => [pr.id, pr]))
     const activeProjects = projects.filter((p) => p.is_active !== false)
 
     const empMap = new Map<string, EmployeeInput>()
 
-    // Helper to resolve specialist person from kpi_record via specialist_person_id OR specialist_id OR user lookup
+    // Helper for flexible name matching (e.g. 'Аня' vs 'Аня Джура', 'Макс' vs 'Максим Дерій')
+    const matchNames = (nameA: string, nameB: string): boolean => {
+      const a = nameA.trim().toLowerCase()
+      const b = nameB.trim().toLowerCase()
+      if (a === b) return true
+      const firstA = a.split(' ')[0]
+      const firstB = b.split(' ')[0]
+      if (firstA && firstB) {
+        if (firstA === firstB) return true
+        if (a.includes(firstB) || b.includes(firstA)) return true
+        if (firstA.slice(0, 3) === firstB.slice(0, 3)) return true
+      }
+      return false
+    }
+
+    // Helper to resolve specialist person from kpi_record via ID or fuzzy name lookup
     const findSpecialistPerson = (rec: DbKpiRecord): DbPerson | null => {
       if (rec.specialist_person_id && peopleById[rec.specialist_person_id]) {
         return peopleById[rec.specialist_person_id]
@@ -229,14 +279,8 @@ export function SalaryLabPage() {
         if (peopleById[rec.specialist_id]) return peopleById[rec.specialist_id]
         const userObj = usersById[rec.specialist_id]
         if (userObj?.full_name) {
-          const normU = userObj.full_name.trim().toLowerCase()
-          const matchedPerson = activePeople.find((p) => p.full_name.trim().toLowerCase() === normU)
-          if (matchedPerson) return matchedPerson
-          const firstU = normU.split(' ')[0]
-          if (firstU) {
-            const partial = activePeople.find((p) => p.full_name.trim().toLowerCase().includes(firstU))
-            if (partial) return partial
-          }
+          const matched = activePeople.find((p) => matchNames(p.full_name, userObj.full_name))
+          if (matched) return matched
         }
       }
       return null
@@ -247,21 +291,14 @@ export function SalaryLabPage() {
       if (proj.pm_person_id && peopleById[proj.pm_person_id]) return peopleById[proj.pm_person_id]
       if (proj.pm_id && peopleById[proj.pm_id]) return peopleById[proj.pm_id]
       if (proj.pm_name) {
-        const normPm = proj.pm_name.trim().toLowerCase()
-        const exact = activePeople.find((p) => p.full_name.trim().toLowerCase() === normPm)
-        if (exact) return exact
-        const firstName = normPm.split(' ')[0]
-        if (firstName) {
-          const partial = activePeople.find(
-            (p) => p.person_type === 'pm' && p.full_name.trim().toLowerCase().includes(firstName),
-          )
-          if (partial) return partial
-        }
+        const normPm = proj.pm_name.trim()
+        const matched = activePeople.find((p) => matchNames(p.full_name, normPm))
+        if (matched) return matched
       }
       return null
     }
 
-    // Helper to calculate PM project KPI score from records in this period based on actual role scores
+    // Helper to calculate PM project KPI score from records in this period
     const getPmProjectKpiScore = (projectId: string): number => {
       const projRecords = kpiRecords.filter((r) => r.project_id === projectId)
       if (projRecords.length === 0) return 100
@@ -316,8 +353,10 @@ export function SalaryLabPage() {
       }
     }
 
-    // B) Process specialist assignments from kpi_records (ONLY ACTIVE WORKING EMPLOYEES)
-    for (const rec of kpiRecords) {
+    // B) Process specialist assignments from period kpiRecords OR fallback to allKpiRecords
+    const targetRecords = kpiRecords.length > 0 ? kpiRecords : allKpiRecords
+
+    for (const rec of targetRecords) {
       const person = findSpecialistPerson(rec)
       const proj = projectsById[rec.project_id]
       if (!person || !proj) continue
@@ -352,12 +391,14 @@ export function SalaryLabPage() {
       const emp = empMap.get(person.id)!
       const exists = emp.assignments.some((a) => a.projectId === proj.id && a.taskRole === rec.task_role)
       if (!exists) {
+        // If Period kpiRecords has this record, use its score; otherwise default score
+        const scoreVal = kpiRecords.length > 0 ? rec.score : '1'
         emp.assignments.push({
           projectId: proj.id,
           projectName: proj.name,
           category: proj.category as ProjectCategory,
           taskRole: rec.task_role as TaskRole,
-          score: rec.score,
+          score: scoreVal,
         })
       }
     }
@@ -392,7 +433,7 @@ export function SalaryLabPage() {
     }
 
     return Array.from(empMap.values())
-  }, [useDemoData, kpiRecords, people, projects, users, employeeGrades])
+  }, [useDemoData, kpiRecords, allKpiRecords, people, projects, users, employeeGrades])
 
   // Collect ALL unique active projects in database (or demo projects)
   const allUniqueProjects = useMemo(() => {
@@ -963,7 +1004,7 @@ export function SalaryLabPage() {
                               <thead className="border-b border-gray-200 text-gray-500 dark:border-gray-800 font-semibold">
                                 <tr>
                                   <th className="py-2">Проєкт</th>
-                                  <th className="py-2">Материнський проєкт</th>
+                                  <th className="py-2">Материнський проєкти</th>
                                   <th className="py-2">Категорія</th>
                                   <th className="py-2 text-center">Базова вага</th>
                                   <th className="py-2 text-center">Дисконт 50%</th>
@@ -1017,7 +1058,7 @@ export function SalaryLabPage() {
                                         {det.scorePercent}% ({det.payoutPercent * 100}% виплати)
                                       </span>
                                     </td>
-                                    <td className="py-2 text-center text-gray-600 dark:text-gray-400 font-mono">
+                                    <td className="py-2 text-right font-mono text-gray-600 dark:text-gray-400">
                                       {det.allocatedKpiBudget}
                                     </td>
                                     <td className="py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
