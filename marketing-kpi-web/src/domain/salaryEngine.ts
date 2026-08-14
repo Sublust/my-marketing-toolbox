@@ -28,6 +28,7 @@ export type SalaryEngineConfig = {
   roleThresholds: RoleThresholds
   gradeGrids: GradeGrids
   discountOption: 'A' | 'B'
+  parentProjectMap?: Record<string, string> // Map of projectId/name -> parentProjectId/name
 }
 
 export const DEFAULT_CATEGORY_WEIGHTS: CategoryWeights = {
@@ -89,6 +90,7 @@ export type EmployeeInput = {
 export type ProjectSalaryDetail = {
   projectId: string
   projectName: string
+  parentProjectName?: string
   taskRole: TaskRole
   category: ProjectCategory
   baseWeight: number
@@ -115,13 +117,6 @@ export type CalculatedEmployeeSalary = {
   projectDetails: ProjectSalaryDetail[]
 }
 
-/**
- * Maps KpiScore symbol or numeric percentage to a payout percentage:
- * - >= 90% (or '1') => 1.00 (100%)
- * - 75%..89.9% (or 'ж') => 0.75 (75%)
- * - 50%..74.9% => 0.50 (50%)
- * - < 50% (or '0' / '-') => 0.00 (0%)
- */
 export function getPayoutMultiplier(score: KpiScore | number): { scorePercent: number; payoutPercent: number } {
   let scorePercent = 0
   if (typeof score === 'number') {
@@ -129,7 +124,7 @@ export function getPayoutMultiplier(score: KpiScore | number): { scorePercent: n
   } else if (score === '1') {
     scorePercent = 100
   } else if (score === 'ж') {
-    scorePercent = 80 // Default yellow performance ~80%
+    scorePercent = 80
   } else {
     scorePercent = 0
   }
@@ -158,9 +153,8 @@ export function calculateEmployeeSalary(
   employee: EmployeeInput,
   config: SalaryEngineConfig = DEFAULT_SALARY_CONFIG,
 ): CalculatedEmployeeSalary {
-  const { categoryWeights, roleThresholds, gradeGrids, discountOption } = config
+  const { categoryWeights, roleThresholds, gradeGrids, discountOption, parentProjectMap = {} } = config
 
-  // 1. Calculate effective points per assignment
   let projectDetails: ProjectSalaryDetail[] = []
 
   if (discountOption === 'A') {
@@ -168,9 +162,12 @@ export function calculateEmployeeSalary(
     projectDetails = employee.assignments.map((ast) => {
       const baseWeight = categoryWeights[ast.category] ?? 0
       const { scorePercent, payoutPercent } = getPayoutMultiplier(ast.score)
+      const parentName = parentProjectMap[ast.projectId] || parentProjectMap[ast.projectName]
+
       return {
         projectId: ast.projectId,
         projectName: ast.projectName,
+        parentProjectName: parentName,
         taskRole: ast.taskRole,
         category: ast.category,
         baseWeight,
@@ -183,87 +180,62 @@ export function calculateEmployeeSalary(
       }
     })
   } else {
-    // Option B: Multichannel / Multi-project discount (50% on 2nd+ channel for specialist, or 2nd+ project for PM)
-    if (employee.roleCategory === 'pm') {
-      // Group by clientGroup or projectName
-      const grouped: Record<string, ProjectAssignmentInput[]> = {}
-      for (const ast of employee.assignments) {
-        const key = ast.clientGroup?.trim() || ast.projectName
-        if (!grouped[key]) grouped[key] = []
-        grouped[key].push(ast)
-      }
+    // Option B: Multichannel / Multi-project discount (50% discount on secondary projects/channels of same parent)
+    const grouped: Record<string, ProjectAssignmentInput[]> = {}
 
-      for (const groupName in grouped) {
-        const groupAssignments = grouped[groupName]
-        // Sort by base weight descending
-        const sorted = [...groupAssignments].sort(
-          (a, b) => (categoryWeights[b.category] ?? 0) - (categoryWeights[a.category] ?? 0),
-        )
+    for (const ast of employee.assignments) {
+      // Determine group key: explicit parent project mapping -> clientGroup -> projectId/name
+      const parentKey =
+        parentProjectMap[ast.projectId] ||
+        parentProjectMap[ast.projectName] ||
+        ast.clientGroup?.trim() ||
+        ast.projectId ||
+        ast.projectName
 
-        sorted.forEach((ast, index) => {
-          const baseWeight = categoryWeights[ast.category] ?? 0
-          const discountApplied = index > 0
-          const effectivePoints = discountApplied ? baseWeight * 0.5 : baseWeight
-          const { scorePercent, payoutPercent } = getPayoutMultiplier(ast.score)
+      if (!grouped[parentKey]) grouped[parentKey] = []
+      grouped[parentKey].push(ast)
+    }
 
-          projectDetails.push({
-            projectId: ast.projectId,
-            projectName: ast.projectName,
-            taskRole: ast.taskRole,
-            category: ast.category,
-            baseWeight,
-            effectivePoints,
-            discountApplied,
-            scorePercent,
-            payoutPercent,
-            allocatedKpiBudget: 0,
-            earnedKpiBonus: 0,
-          })
+    for (const parentKey in grouped) {
+      const groupAssignments = grouped[parentKey]
+      // Sort assignments: primary project (matching parentKey) or highest base weight first
+      const sorted = [...groupAssignments].sort((a, b) => {
+        const isAParent = a.projectId === parentKey || a.projectName === parentKey
+        const isBParent = b.projectId === parentKey || b.projectName === parentKey
+        if (isAParent && !isBParent) return -1
+        if (!isAParent && isBParent) return 1
+        return (categoryWeights[b.category] ?? 0) - (categoryWeights[a.category] ?? 0)
+      })
+
+      sorted.forEach((ast, index) => {
+        const baseWeight = categoryWeights[ast.category] ?? 0
+        const discountApplied = index > 0
+        const effectivePoints = discountApplied ? baseWeight * 0.5 : baseWeight
+        const { scorePercent, payoutPercent } = getPayoutMultiplier(ast.score)
+        const parentName = parentProjectMap[ast.projectId] || parentProjectMap[ast.projectName] || parentKey
+
+        projectDetails.push({
+          projectId: ast.projectId,
+          projectName: ast.projectName,
+          parentProjectName: parentName !== ast.projectName ? parentName : undefined,
+          taskRole: ast.taskRole,
+          category: ast.category,
+          baseWeight,
+          effectivePoints,
+          discountApplied,
+          scorePercent,
+          payoutPercent,
+          allocatedKpiBudget: 0,
+          earnedKpiBonus: 0,
         })
-      }
-    } else {
-      // Specialist: Group by projectId / projectName
-      const grouped: Record<string, ProjectAssignmentInput[]> = {}
-      for (const ast of employee.assignments) {
-        const key = ast.projectId || ast.projectName
-        if (!grouped[key]) grouped[key] = []
-        grouped[key].push(ast)
-      }
-
-      for (const projKey in grouped) {
-        const projAssignments = grouped[projKey]
-        const sorted = [...projAssignments].sort(
-          (a, b) => (categoryWeights[b.category] ?? 0) - (categoryWeights[a.category] ?? 0),
-        )
-
-        sorted.forEach((ast, index) => {
-          const baseWeight = categoryWeights[ast.category] ?? 0
-          const discountApplied = index > 0
-          const effectivePoints = discountApplied ? baseWeight * 0.5 : baseWeight
-          const { scorePercent, payoutPercent } = getPayoutMultiplier(ast.score)
-
-          projectDetails.push({
-            projectId: ast.projectId,
-            projectName: ast.projectName,
-            taskRole: ast.taskRole,
-            category: ast.category,
-            baseWeight,
-            effectivePoints,
-            discountApplied,
-            scorePercent,
-            payoutPercent,
-            allocatedKpiBudget: 0,
-            earnedKpiBonus: 0,
-          })
-        })
-      }
+      })
     }
   }
 
-  // 2. Sum total points
+  // Sum total points
   const totalPoints = projectDetails.reduce((sum, d) => sum + d.effectivePoints, 0)
 
-  // 3. Determine Load Level & Grade payouts
+  // Determine Load Level & Grade payouts
   const threshold = roleThresholds[employee.roleCategory] ?? { lowMax: 30, medMax: 40 }
   const loadLevel = determineLoadLevel(totalPoints, threshold)
 
@@ -272,7 +244,7 @@ export function calculateEmployeeSalary(
 
   const { baseRate, projectBonus, kpiBudget: maxKpiBudget } = payoutConfig
 
-  // 4. Allocate KPI Budget per project & calculate earned KPI bonus
+  // Allocate KPI Budget per project & calculate earned KPI bonus
   let totalEarnedKpiBonus = 0
   if (totalPoints > 0) {
     projectDetails = projectDetails.map((detail) => {

@@ -6,6 +6,7 @@ import {
   Database,
   DollarSign,
   FileSpreadsheet,
+  GitFork,
   Layers,
   RotateCcw,
   Sliders,
@@ -52,11 +53,11 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
     roleCategory: 'context',
     grade: 'Senior',
     assignments: [
-      { projectId: 'dp-6', projectName: 'Модний доктор (VIP)', category: 'VIP', taskRole: 'context', score: 95 },
-      { projectId: 'dp-7', projectName: 'Healthfit (A)', category: 'A', taskRole: 'context', score: 90 },
-      { projectId: 'dp-8', projectName: 'stimma (A)', category: 'A', taskRole: 'context', score: 82 },
-      { projectId: 'dp-9', projectName: 'Хендівер (B)', category: 'B', taskRole: 'context', score: 78 },
-      { projectId: 'dp-10', projectName: 'DNS (C)', category: 'C', taskRole: 'context', score: 65 },
+      { projectId: 'dp-6', projectName: 'Модний доктор', category: 'VIP', taskRole: 'context', score: 95 },
+      { projectId: 'dp-7', projectName: 'HealthFit', category: 'A', taskRole: 'context', score: 90 },
+      { projectId: 'dp-8', projectName: 'stimma', category: 'A', taskRole: 'context', score: 82 },
+      { projectId: 'dp-9', projectName: 'Хендівер', category: 'B', taskRole: 'context', score: 78 },
+      { projectId: 'dp-10', projectName: 'DNS', category: 'C', taskRole: 'context', score: 65 },
     ],
   },
   {
@@ -65,11 +66,11 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
     roleCategory: 'pm',
     grade: 'Middle',
     assignments: [
-      { projectId: 'dp-11', projectName: 'HealthFit', clientGroup: 'HealthFit Group', category: 'A', taskRole: 'seo', score: 90 },
-      { projectId: 'dp-12', projectName: 'Соларей', clientGroup: 'HealthFit Group', category: 'C', taskRole: 'seo', score: 85 },
-      { projectId: 'dp-13', projectName: 'Майнд Ші', clientGroup: 'HealthFit Group', category: 'C', taskRole: 'seo', score: 80 },
-      { projectId: 'dp-14', projectName: 'DNS', clientGroup: 'HealthFit Group', category: 'C', taskRole: 'seo', score: 75 },
-      { projectId: 'dp-15', projectName: 'Модний доктор', clientGroup: 'Doctor Group', category: 'VIP', taskRole: 'seo', score: 95 },
+      { projectId: 'dp-7', projectName: 'HealthFit', category: 'A', taskRole: 'seo', score: 90 },
+      { projectId: 'dp-12', projectName: 'Соларей', category: 'C', taskRole: 'seo', score: 85 },
+      { projectId: 'dp-13', projectName: 'Майнд Ші', category: 'C', taskRole: 'seo', score: 80 },
+      { projectId: 'dp-10', projectName: 'DNS', category: 'C', taskRole: 'seo', score: 75 },
+      { projectId: 'dp-6', projectName: 'Модний доктор', category: 'VIP', taskRole: 'seo', score: 95 },
     ],
   },
   {
@@ -78,11 +79,11 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
     roleCategory: 'target',
     grade: 'Middle',
     assignments: [
-      { projectId: 'dp-16', projectName: 'Модний доктор (Meta)', category: 'VIP', taskRole: 'target', score: 95 },
-      { projectId: 'dp-16', projectName: 'Модний доктор (TikTok)', category: 'VIP', taskRole: 'tiktok', score: 80 },
-      { projectId: 'dp-17', projectName: 'stimma (Meta)', category: 'A', taskRole: 'target', score: 60 },
-      { projectId: 'dp-17', projectName: 'stimma (TikTok)', category: 'A', taskRole: 'tiktok', score: 45 },
-      { projectId: 'dp-18', projectName: 'Хендівер', category: 'B', taskRole: 'target', score: 100 },
+      { projectId: 'dp-6', projectName: 'Модний доктор (Meta)', category: 'VIP', taskRole: 'target', score: 95 },
+      { projectId: 'dp-6-tt', projectName: 'Модний доктор (TikTok)', category: 'VIP', taskRole: 'tiktok', score: 80 },
+      { projectId: 'dp-8', projectName: 'stimma (Meta)', category: 'A', taskRole: 'target', score: 60 },
+      { projectId: 'dp-8-tt', projectName: 'stimma (TikTok)', category: 'A', taskRole: 'tiktok', score: 45 },
+      { projectId: 'dp-9', projectName: 'Хендівер', category: 'B', taskRole: 'target', score: 100 },
     ],
   },
   {
@@ -91,9 +92,9 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
     roleCategory: 'pm',
     grade: 'Middle',
     assignments: [
-      { projectId: 'dp-19', projectName: 'stimma', clientGroup: 'stimma', category: 'A', taskRole: 'seo', score: 90 },
-      { projectId: 'dp-20', projectName: 'Хендівер', clientGroup: 'Хендівер', category: 'B', taskRole: 'seo', score: 85 },
-      { projectId: 'dp-21', projectName: 'Проєкт Alfa', clientGroup: 'Alfa', category: 'B', taskRole: 'seo', score: 70 },
+      { projectId: 'dp-8', projectName: 'stimma', category: 'A', taskRole: 'seo', score: 90 },
+      { projectId: 'dp-9', projectName: 'Хендівер', category: 'B', taskRole: 'seo', score: 85 },
+      { projectId: 'dp-21', projectName: 'Проєкт Alfa', category: 'B', taskRole: 'seo', score: 70 },
     ],
   },
   {
@@ -124,10 +125,20 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
     grade: 'Junior',
     assignments: [
       { projectId: 'dp-27', projectName: 'Бренд A (Meta)', category: 'B', taskRole: 'target', score: 85 },
-      { projectId: 'dp-27', projectName: 'Бренд A (TikTok)', category: 'B', taskRole: 'tiktok', score: 70 },
+      { projectId: 'dp-27-tt', projectName: 'Бренд A (TikTok)', category: 'B', taskRole: 'tiktok', score: 70 },
     ],
   },
 ]
+
+// Default parent project relationships mapping for demo data
+const DEFAULT_PARENT_PROJECT_MAP: Record<string, string> = {
+  'Соларей': 'HealthFit',
+  'Майнд Ші': 'HealthFit',
+  'DNS': 'HealthFit',
+  'Модний доктор (TikTok)': 'Модний доктор (Meta)',
+  'stimma (TikTok)': 'stimma (Meta)',
+  'Бренд A (TikTok)': 'Бренд A (Meta)',
+}
 
 export function SalaryLabPage() {
   const [period, setPeriod] = useState<DbPeriod | null>(null)
@@ -141,8 +152,10 @@ export function SalaryLabPage() {
   // Dynamic configuration controls
   const [categoryWeights, setCategoryWeights] = useState<CategoryWeights>(DEFAULT_CATEGORY_WEIGHTS)
   const [roleThresholds, setRoleThresholds] = useState<RoleThresholds>(DEFAULT_ROLE_THRESHOLDS)
+  const [parentProjectMap, setParentProjectMap] = useState<Record<string, string>>(DEFAULT_PARENT_PROJECT_MAP)
   const [activeViewOption, setActiveViewOption] = useState<'A' | 'B' | 'compare'>('compare')
   const [showConfigPanel, setShowConfigPanel] = useState<boolean>(true)
+  const [showParentMappingPanel, setShowParentMappingPanel] = useState<boolean>(false)
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null)
 
   // Load database records for current period
@@ -173,13 +186,11 @@ export function SalaryLabPage() {
       return DEMO_EMPLOYEES
     }
 
-    // Map real people and kpi_records into EmployeeInput format
     const peopleById = Object.fromEntries(people.map((p) => [p.id, p]))
     const projectsById = Object.fromEntries(projects.map((pr) => [pr.id, pr]))
 
     const empMap = new Map<string, EmployeeInput>()
 
-    // Process specialist assignments from kpi_records
     for (const rec of kpiRecords) {
       if (!rec.specialist_id) continue
       const person = peopleById[rec.specialist_id]
@@ -211,7 +222,6 @@ export function SalaryLabPage() {
       })
     }
 
-    // Also include PMs if they own projects
     for (const proj of projects) {
       if (!proj.pm_id) continue
       const pmPerson = peopleById[proj.pm_id]
@@ -233,7 +243,6 @@ export function SalaryLabPage() {
         pmEmp.assignments.push({
           projectId: proj.id,
           projectName: proj.name,
-          clientGroup: proj.name.split(' ')[0],
           category: proj.category as ProjectCategory,
           taskRole: 'seo',
           score: '1',
@@ -244,6 +253,20 @@ export function SalaryLabPage() {
     return Array.from(empMap.values())
   }, [useDemoData, kpiRecords, people, projects])
 
+  // Collect unique projects across all assignments
+  const allUniqueProjects = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; category: ProjectCategory }>()
+    for (const emp of employees) {
+      for (const ast of emp.assignments) {
+        const key = ast.projectId || ast.projectName
+        if (!map.has(key)) {
+          map.set(key, { id: key, name: ast.projectName, category: ast.category })
+        }
+      }
+    }
+    return Array.from(map.values())
+  }, [employees])
+
   // Calculate results for Option A & Option B under current config
   const calculatedData = useMemo(() => {
     const configA: SalaryEngineConfig = {
@@ -251,6 +274,7 @@ export function SalaryLabPage() {
       roleThresholds,
       gradeGrids: DEFAULT_GRADE_GRIDS,
       discountOption: 'A',
+      parentProjectMap,
     }
 
     const configB: SalaryEngineConfig = {
@@ -258,6 +282,7 @@ export function SalaryLabPage() {
       roleThresholds,
       gradeGrids: DEFAULT_GRADE_GRIDS,
       discountOption: 'B',
+      parentProjectMap,
     }
 
     const resultsA = employees.map((emp) => calculateEmployeeSalary(emp, configA))
@@ -277,11 +302,12 @@ export function SalaryLabPage() {
       diffTotal,
       diffPct,
     }
-  }, [employees, categoryWeights, roleThresholds])
+  }, [employees, categoryWeights, roleThresholds, parentProjectMap])
 
   const resetConfig = () => {
     setCategoryWeights(DEFAULT_CATEGORY_WEIGHTS)
     setRoleThresholds(DEFAULT_ROLE_THRESHOLDS)
+    setParentProjectMap(DEFAULT_PARENT_PROJECT_MAP)
   }
 
   return (
@@ -299,7 +325,7 @@ export function SalaryLabPage() {
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Моделювання та випробування нових регламентів нарахування заробітної плати з можливості ручного коригування коефіцієнтів та порогів навантаження.
+              Моделювання та випробування нових регламентів нарахування заробітної плати з можливості ручного коригування коефіцієнтів, меж навантаження та зв'язків проєктів.
             </p>
           </div>
 
@@ -473,10 +499,106 @@ export function SalaryLabPage() {
                   </button>
                 </div>
               </div>
+
+              <button
+                onClick={() => setShowParentMappingPanel(!showParentMappingPanel)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300 transition-colors"
+              >
+                <GitFork className="h-4 w-4" />
+                {showParentMappingPanel ? 'Сховати зв\'язки проєктів' : 'Налаштувати материнські проєкти'}
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Parent Project Relationships Panel */}
+      {showParentMappingPanel && (
+        <div className="rounded-xl border border-purple-200 bg-white p-6 shadow-sm dark:border-purple-900/40 dark:bg-gray-900 space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                <GitFork className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                Зв'язки проєктів та материнські проєкти (для дисконту 50% у Варіанті B)
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Вкажіть материнський/головний проєкт або клієнтську групу для кожного напрямку чи додаткового проєкту одного клієнта.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 font-semibold uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-2.5">Проєкт / Напрямок</th>
+                  <th className="px-3 py-2.5">Категорія</th>
+                  <th className="px-4 py-2.5">Материнський / Головний проєкт</th>
+                  <th className="px-4 py-2.5 text-center">Статус у Варіанті B</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                {allUniqueProjects.map((p) => {
+                  const parentVal = parentProjectMap[p.id] || parentProjectMap[p.name] || ''
+
+                  return (
+                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                      <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-gray-100">
+                        {p.name}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                          {p.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <select
+                          value={parentVal}
+                          onChange={(e) => {
+                            const newParent = e.target.value
+                            setParentProjectMap((prev) => {
+                              const updated = { ...prev }
+                              if (!newParent) {
+                                delete updated[p.id]
+                                delete updated[p.name]
+                              } else {
+                                updated[p.id] = newParent
+                                updated[p.name] = newParent
+                              }
+                              return updated
+                            })
+                          }}
+                          className="w-full max-w-xs rounded border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                          <option value="">— Головний проєкт (Самостійний, 100% балів) —</option>
+                          {allUniqueProjects
+                            .filter((item) => item.name !== p.name && item.id !== p.id)
+                            .map((item) => (
+                              <option key={item.id} value={item.name}>
+                                {item.name} ({item.category})
+                              </option>
+                            ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        {parentVal ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                            Дочірній (-50% дисконт)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                            Головний (100% балів)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* KPI Summary Stat Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -505,7 +627,7 @@ export function SalaryLabPage() {
           <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-50">
             {calculatedData.totalSalaryB} <span className="text-xs font-normal text-gray-500">тис. грн</span>
           </div>
-          <p className="mt-1 text-[11px] text-gray-400">З дисконтом 50% на 2+ канали/проєкти</p>
+          <p className="mt-1 text-[11px] text-gray-400">З дисконтом 50% на материнські/дочірні проєкти</p>
         </div>
 
         {/* Card 3: Difference A vs B */}
@@ -677,6 +799,7 @@ export function SalaryLabPage() {
                               <thead className="border-b border-gray-200 text-gray-500 dark:border-gray-800 font-semibold">
                                 <tr>
                                   <th className="py-2">Проєкт</th>
+                                  <th className="py-2">Материнський проєкт</th>
                                   <th className="py-2">Категорія</th>
                                   <th className="py-2 text-center">Базова вага</th>
                                   <th className="py-2 text-center">Дисконт 50%</th>
@@ -692,6 +815,16 @@ export function SalaryLabPage() {
                                     <td className="py-2 font-medium text-gray-900 dark:text-gray-100">
                                       {det.projectName}
                                       {det.taskRole && <span className="ml-2 text-[10px] text-gray-400">({det.taskRole})</span>}
+                                    </td>
+                                    <td className="py-2 text-gray-500 dark:text-gray-400">
+                                      {det.parentProjectName ? (
+                                        <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                                          <GitFork className="h-3 w-3" />
+                                          {det.parentProjectName}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">— (Головний)</span>
+                                      )}
                                     </td>
                                     <td className="py-2">
                                       <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
