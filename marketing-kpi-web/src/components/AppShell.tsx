@@ -49,7 +49,7 @@ export function AppShell() {
               <NavItem to="/kpi">KPI</NavItem>
               <NavItem to="/dashboard">Dashboard</NavItem>
               <NavItem to="/settings">Settings</NavItem>
-              {profile?.role === 'admin' && (
+              {profile?.role?.toLowerCase().trim() === 'admin' && (
                 <NavItem to="/salary-lab">Експеримент ЗП</NavItem>
               )}
             </nav>

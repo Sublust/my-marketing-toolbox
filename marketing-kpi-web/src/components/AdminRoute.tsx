@@ -16,7 +16,7 @@ export function AdminRoute() {
     return <Navigate to="/login" replace />
   }
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role?.toLowerCase().trim() !== 'admin') {
     return <Navigate to="/kpi" replace />
   }
 
