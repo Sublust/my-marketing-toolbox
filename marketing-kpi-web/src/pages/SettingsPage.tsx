@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { PeriodPicker } from '../components/PeriodPicker'
 import { useAuth } from '../context/AuthProvider'
 import { getCanonicalFullName } from '../lib/personUtils'
@@ -285,27 +286,95 @@ export function SettingsPage() {
   const [isStandardizing, setIsStandardizing] = useState(false)
   const [standardizeMsg, setStandardizeMsg] = useState<string | null>(null)
 
-  const standardizeAllNames = async () => {
+  const mergeAndDeduplicatePeople = async () => {
     if (!isAdmin) return
     setIsStandardizing(true)
+    setSpecsError(null)
     setStandardizeMsg(null)
+
     try {
-      // 1. Update people table with canonical full names
-      for (const p of people) {
+      // 1. Fetch latest people, projects, and kpi_records
+      const [{ data: pplData }, { data: prjData }] = await Promise.all([
+        supabase.from('people').select('*'),
+        supabase.from('projects').select('*'),
+      ])
+
+      const currentPeople = (pplData ?? []) as DbPerson[]
+      const currentProjects = (prjData ?? []) as DbProject[]
+
+      // Group people by canonical full name + person_type (or purely canonical full name)
+      const groups = new Map<string, DbPerson[]>()
+      for (const p of currentPeople) {
         const canonical = getCanonicalFullName(p.full_name)
-        if (canonical && canonical !== p.full_name) {
-          await supabase.from('people').update({ full_name: canonical }).eq('id', p.id)
-        }
+        const key = `${canonical.toLowerCase()}_${p.person_type}`
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key)!.push(p)
       }
-      // 2. Update projects table pm_name with canonical full names
-      for (const proj of projects) {
-        if (proj.pm_name) {
-          const canonicalPm = getCanonicalFullName(proj.pm_name)
-          if (canonicalPm && canonicalPm !== proj.pm_name) {
-            await supabase.from('projects').update({ pm_name: canonicalPm }).eq('id', proj.id)
+
+      let mergedCount = 0
+
+      for (const [, list] of groups.entries()) {
+        if (list.length > 1) {
+          // Primary is active one or the first one
+          const primary = list.find((x) => x.is_active) ?? list[0]
+          const duplicates = list.filter((x) => x.id !== primary.id)
+
+          // Merge directions
+          const allDirections = Array.from(
+            new Set([
+              ...(primary.directions || []),
+              ...duplicates.flatMap((d) => d.directions || []),
+            ])
+          )
+
+          const canonicalName = getCanonicalFullName(primary.full_name)
+          await supabase
+            .from('people')
+            .update({ full_name: canonicalName, directions: allDirections })
+            .eq('id', primary.id)
+
+          for (const dup of duplicates) {
+            // Reassign kpi_records
+            await supabase
+              .from('kpi_records')
+              .update({ specialist_person_id: primary.id })
+              .eq('specialist_person_id', dup.id)
+
+            // Reassign projects
+            await supabase
+              .from('projects')
+              .update({ pm_person_id: primary.id, pm_name: canonicalName })
+              .eq('pm_person_id', dup.id)
+
+            // Delete duplicate person row
+            const { error: delErr } = await supabase
+              .from('people')
+              .delete()
+              .eq('id', dup.id)
+
+            if (!delErr) {
+              mergedCount++
+            }
+          }
+        } else if (list.length === 1) {
+          const p = list[0]
+          const canonical = getCanonicalFullName(p.full_name)
+          if (canonical !== p.full_name) {
+            await supabase.from('people').update({ full_name: canonical }).eq('id', p.id)
           }
         }
       }
+
+      // Also ensure all projects have canonical pm_name
+      for (const prj of currentProjects) {
+        if (prj.pm_name) {
+          const canonicalPm = getCanonicalFullName(prj.pm_name)
+          if (canonicalPm !== prj.pm_name) {
+            await supabase.from('projects').update({ pm_name: canonicalPm }).eq('id', prj.id)
+          }
+        }
+      }
+
       // Refresh local lists
       const [{ data: ppl }, { data: prj }] = await Promise.all([
         supabase.from('people').select('*').order('full_name'),
@@ -313,12 +382,34 @@ export function SettingsPage() {
       ])
       if (ppl) setPeople(ppl as DbPerson[])
       if (prj) setProjects(prj as DbProject[])
-      setStandardizeMsg("Усі імена та прізвища успішно уніфіковано в системі!")
+
+      setStandardizeMsg(
+        mergedCount > 0
+          ? `Успішно об'єднано та очищено ${mergedCount} дублікатів!`
+          : `Дублікатів не виявлено, всі імена уніфіковано.`
+      )
     } catch (e: any) {
-      setStandardizeMsg(`Помилка: ${e.message}`)
+      setSpecsError(`Помилка об'єднання: ${e.message}`)
     } finally {
       setIsStandardizing(false)
     }
+  }
+
+  const deletePerson = async (p: DbPerson) => {
+    if (!confirm(`Видалити запис «${p.full_name}» з бази даних?`)) return
+    setSpecsError(null)
+
+    const { error } = await supabase
+      .from('people')
+      .delete()
+      .eq('id', p.id)
+
+    if (error) {
+      setSpecsError(`Не вдалося видалити: ${error.message}`)
+      return
+    }
+
+    setPeople((prev) => prev.filter((x) => x.id !== p.id))
   }
 
   const createCurrentPeriod = async () => {
@@ -872,12 +963,12 @@ export function SettingsPage() {
                 </div>
               </div>
               <button
-                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300 disabled:opacity-50 transition-colors shrink-0"
-                onClick={() => void standardizeAllNames()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300 disabled:opacity-50 transition-colors shrink-0 shadow-sm"
+                onClick={() => void mergeAndDeduplicatePeople()}
                 disabled={isStandardizing}
-                title="Оновити всі скорочені імена в базі даних до повного формату (Ім'я + Прізвище)"
+                title="Оновити всі скорочені імена та автоматично об'єднати дублікати в базі даних"
               >
-                {isStandardizing ? "Уніфікую..." : "✨ Уніфікувати всі імена (Ім'я + Прізвище)"}
+                {isStandardizing ? "Очищую..." : "✨ Уніфікувати та об'єднати дублікати"}
               </button>
             </div>
 
@@ -1102,17 +1193,28 @@ export function SettingsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            className={[
-                              'rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm hover:opacity-90',
-                              p.is_active
-                                ? 'border-red-200 bg-white text-red-600 dark:border-red-900/60 dark:bg-gray-950 dark:text-red-400'
-                                : 'border-green-200 bg-white text-green-600 dark:border-green-900/60 dark:bg-gray-950 dark:text-green-400',
-                            ].join(' ')}
-                            onClick={() => void togglePersonActive(p)}
-                          >
-                            {p.is_active ? 'Позначити як звільненого' : 'Активувати'}
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              className={[
+                                'rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm hover:opacity-90 transition-opacity',
+                                p.is_active
+                                  ? 'border-red-200 bg-white text-red-600 dark:border-red-900/60 dark:bg-gray-950 dark:text-red-400'
+                                  : 'border-green-200 bg-white text-green-600 dark:border-green-900/60 dark:bg-gray-950 dark:text-green-400',
+                              ].join(' ')}
+                              onClick={() => void togglePersonActive(p)}
+                            >
+                              {p.is_active ? 'Позначити як звільненого' : 'Активувати'}
+                            </button>
+
+                            <button
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 shadow-sm hover:border-red-300 hover:text-red-600 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-red-900/60 dark:hover:text-red-400 transition-colors"
+                              onClick={() => void deletePerson(p)}
+                              title={`Видалити запис «${p.full_name}»`}
+                              aria-label={`Видалити працівника ${p.full_name}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
