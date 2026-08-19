@@ -147,6 +147,19 @@ export function SettingsPage() {
     setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, is_active: !x.is_active } : x)))
   }
 
+  const updateProjectCategory = async (p: DbProject, newCategory: 'VIP' | 'A' | 'B' | 'C') => {
+    setProjectsError(null)
+    const { error } = await supabase
+      .from('projects')
+      .update({ category: newCategory })
+      .eq('id', p.id)
+    if (error) {
+      setProjectsError(error.message)
+      return
+    }
+    setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, category: newCategory } : x)))
+  }
+
   const addSpecialist = async () => {
     if (!isAdmin) return
     if (!newSpecName.trim()) {
@@ -920,7 +933,27 @@ export function SettingsPage() {
                   {projects.map((p) => (
                     <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{p.category}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <select
+                          value={p.category}
+                          onChange={(e) => void updateProjectCategory(p, e.target.value as 'VIP' | 'A' | 'B' | 'C')}
+                          className={`rounded border px-2 py-1 text-xs font-bold shadow-sm transition-colors cursor-pointer dark:bg-gray-900 ${
+                            p.category === 'VIP'
+                              ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-800 dark:text-purple-300'
+                              : p.category === 'A'
+                              ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:text-blue-300'
+                              : p.category === 'B'
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300'
+                              : 'border-gray-300 bg-gray-50 text-gray-700 dark:border-gray-700 dark:text-gray-300'
+                          }`}
+                          title="Змінити категорію проєкту"
+                        >
+                          <option value="VIP">VIP</option>
+                          <option value="A">A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                        </select>
+                      </td>
                       <td className="px-4 py-3 text-sm">
                         <span
                           className={[
