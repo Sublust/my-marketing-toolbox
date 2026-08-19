@@ -83,8 +83,14 @@ export function SettingsPage() {
 
   const [newSpecName, setNewSpecName] = useState('')
   const [newSpecDirections, setNewSpecDirections] = useState<TaskRole[]>([])
+  const [newPersonType, setNewPersonType] = useState<'specialist' | 'pm'>('specialist')
   const [specsError, setSpecsError] = useState<string | null>(null)
   const [isAddingSpec, setIsAddingSpec] = useState(false)
+
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null)
+  const [editingPersonName, setEditingPersonName] = useState<string>('')
+  const [isSavingPersonName, setIsSavingPersonName] = useState<boolean>(false)
+  const [peopleFilter, setPeopleFilter] = useState<'all' | 'specialist' | 'pm'>('all')
 
   useEffect(() => {
     let alive = true
@@ -164,7 +170,7 @@ export function SettingsPage() {
   const addSpecialist = async () => {
     if (!isAdmin) return
     if (!newSpecName.trim()) {
-      setSpecsError("Введіть ім'я спеціаліста.")
+      setSpecsError("Введіть ім'я та прізвище працівника.")
       return
     }
     setIsAddingSpec(true)
@@ -174,9 +180,9 @@ export function SettingsPage() {
       .from('people')
       .insert({
         full_name: newSpecName.trim(),
-        person_type: 'specialist',
+        person_type: newPersonType,
         is_active: true,
-        directions: newSpecDirections,
+        directions: newPersonType === 'specialist' ? newSpecDirections : [],
       })
       .select('id, full_name, person_type, is_active, directions')
       .single()
@@ -184,7 +190,7 @@ export function SettingsPage() {
     setIsAddingSpec(false)
     if (error) {
       const msg = error.message.includes('duplicate') || error.message.includes('unique')
-        ? "Спеціаліст з таким ім'ям вже існує."
+        ? "Працівник з таким ім'ям вже існує."
         : error.message
       setSpecsError(msg)
       return
@@ -195,6 +201,55 @@ export function SettingsPage() {
       setNewSpecName('')
       setNewSpecDirections([])
     }
+  }
+
+  const savePersonName = async (personId: string) => {
+    const newName = editingPersonName.trim()
+    if (!newName) return
+    setIsSavingPersonName(true)
+    setSpecsError(null)
+
+    const person = people.find((p) => p.id === personId)
+    const oldName = person?.full_name
+
+    const { error } = await supabase
+      .from('people')
+      .update({ full_name: newName })
+      .eq('id', personId)
+
+    if (error) {
+      setSpecsError(error.message)
+      setIsSavingPersonName(false)
+      return
+    }
+
+    // Synchronize projects.pm_name if person is a PM or has matching pm_name
+    if (person?.person_type === 'pm' || oldName) {
+      if (oldName) {
+        await supabase
+          .from('projects')
+          .update({ pm_name: newName })
+          .eq('pm_name', oldName)
+      }
+      await supabase
+        .from('projects')
+        .update({ pm_name: newName })
+        .eq('pm_person_id', personId)
+    }
+
+    // Update local state
+    setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, full_name: newName } : p)))
+    setProjects((prev) =>
+      prev.map((proj) =>
+        proj.pm_person_id === personId || (oldName && proj.pm_name === oldName)
+          ? { ...proj, pm_name: newName }
+          : proj
+      )
+    )
+
+    setEditingPersonId(null)
+    setEditingPersonName('')
+    setIsSavingPersonName(false)
   }
 
   const togglePersonActive = async (p: DbPerson) => {
@@ -807,13 +862,13 @@ export function SettingsPage() {
             </div>
           </div>
 
-          {/* Specialists section */}
+          {/* Team / People section */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">Спеціалісти</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">Працівники (Спеціалісти та PM)</div>
                 <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Додавання нових спеціалістів, налаштування напрямків роботи та статус активності.
+                  Редагування імен та прізвищ, додавання нових працівників, налаштування напрямків роботи та статус активності.
                 </div>
               </div>
               <button
@@ -838,45 +893,61 @@ export function SettingsPage() {
               </div>
             ) : null}
 
-            {/* Новий спеціаліст */}
+            {/* Новий працівник */}
             <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-3">
-                Новий спеціаліст
+                Новий працівник
               </div>
               <div className="flex flex-col gap-4 md:flex-row md:items-end">
+                <div className="w-36">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Роль
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                    value={newPersonType}
+                    onChange={(e) => setNewPersonType(e.target.value as 'specialist' | 'pm')}
+                  >
+                    <option value="specialist">Спеціаліст</option>
+                    <option value="pm">PM</option>
+                  </select>
+                </div>
+
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    ПІБ / Ім'я
+                    ПІБ / Ім'я та Прізвище
                   </label>
                   <input
                     type="text"
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                    placeholder="Наприклад: Олександр"
+                    placeholder="Наприклад: Олександр Коваленко"
                     value={newSpecName}
                     onChange={(e) => setNewSpecName(e.target.value)}
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-4 py-2">
-                  {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {
-                    const label = role === 'seo' ? 'SEO' : role === 'context' ? 'Контекст' : role === 'target' ? 'Таргет' : 'TikTok';
-                    return (
-                      <label key={role} className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-blue-600 dark:border-gray-700 dark:bg-gray-900"
-                          checked={newSpecDirections.includes(role)}
-                          onChange={() => {
-                            setNewSpecDirections((prev) =>
-                              prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-                            )
-                          }}
-                        />
-                        {label}
-                      </label>
-                    );
-                  })}
-                </div>
+                {newPersonType === 'specialist' ? (
+                  <div className="flex flex-wrap gap-4 py-2">
+                    {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {
+                      const label = role === 'seo' ? 'SEO' : role === 'context' ? 'Контекст' : role === 'target' ? 'Таргет' : 'TikTok';
+                      return (
+                        <label key={role} className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 dark:border-gray-700 dark:bg-gray-900"
+                            checked={newSpecDirections.includes(role)}
+                            onChange={() => {
+                              setNewSpecDirections((prev) =>
+                                prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+                              )
+                            }}
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
                 <div>
                   <button
@@ -884,47 +955,139 @@ export function SettingsPage() {
                     onClick={addSpecialist}
                     disabled={isAddingSpec}
                   >
-                    Додати спеціаліста
+                    Додати
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Список спеціалістів */}
-            <div className="mt-5 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+            {/* Фільтр списку */}
+            <div className="mt-5 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-900">
+                <button
+                  className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                    peopleFilter === 'all'
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                  onClick={() => setPeopleFilter('all')}
+                >
+                  Всі ({people.length})
+                </button>
+                <button
+                  className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                    peopleFilter === 'specialist'
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                  onClick={() => setPeopleFilter('specialist')}
+                >
+                  Спеціалісти ({people.filter((p) => p.person_type === 'specialist').length})
+                </button>
+                <button
+                  className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                    peopleFilter === 'pm'
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                  onClick={() => setPeopleFilter('pm')}
+                >
+                  PM ({people.filter((p) => p.person_type === 'pm').length})
+                </button>
+              </div>
+            </div>
+
+            {/* Таблиця працівників */}
+            <div className="mt-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
               <table className="min-w-[640px] w-full divide-y divide-gray-200 dark:divide-gray-800">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Спеціаліст</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Напрямки роботи</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Працівник (Ім'я та Прізвище)</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Роль / Напрямки</th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Статус</th>
                     <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Дія</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {people
-                    .filter((p) => p.person_type === 'specialist')
+                    .filter((p) => peopleFilter === 'all' || p.person_type === peopleFilter)
                     .map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{getCanonicalFullName(p.full_name)}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {editingPersonId === p.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                className="rounded-md border border-indigo-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-indigo-700 dark:bg-gray-900 dark:text-gray-100"
+                                value={editingPersonName}
+                                onChange={(e) => setEditingPersonName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') void savePersonName(p.id)
+                                  if (e.key === 'Escape') setEditingPersonId(null)
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                                onClick={() => void savePersonName(p.id)}
+                                disabled={isSavingPersonName}
+                                title="Зберегти"
+                              >
+                                {isSavingPersonName ? '...' : '✓'}
+                              </button>
+                              <button
+                                className="rounded-md bg-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300"
+                                onClick={() => setEditingPersonId(null)}
+                                title="Скасувати"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span className="cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => {
+                                setEditingPersonId(p.id)
+                                setEditingPersonName(p.full_name)
+                              }}>
+                                {getCanonicalFullName(p.full_name)}
+                              </span>
+                              <button
+                                className="opacity-40 group-hover:opacity-100 transition-opacity p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                onClick={() => {
+                                  setEditingPersonId(p.id)
+                                  setEditingPersonName(p.full_name)
+                                }}
+                                title="Редагувати ім'я та прізвище"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm">
-                          <div className="flex flex-wrap gap-4">
-                            {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {
-                              const label = role === 'seo' ? 'SEO' : role === 'context' ? 'Контекст' : role === 'target' ? 'Таргет' : 'TikTok';
-                              const hasRole = Array.isArray(p.directions) && p.directions.includes(role);
-                              return (
-                                <label key={role} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-                                  <input
-                                    type="checkbox"
-                                    className="rounded border-gray-300 text-blue-600 dark:border-gray-700 dark:bg-gray-900"
-                                    checked={hasRole}
-                                    onChange={() => void togglePersonDirection(p, role)}
-                                  />
-                                  {label}
-                                </label>
-                              );
-                            })}
-                          </div>
+                          {p.person_type === 'pm' ? (
+                            <span className="inline-flex rounded bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                              PM (Project Manager)
+                            </span>
+                          ) : (
+                            <div className="flex flex-wrap gap-4">
+                              {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {
+                                const label = role === 'seo' ? 'SEO' : role === 'context' ? 'Контекст' : role === 'target' ? 'Таргет' : 'TikTok';
+                                const hasRole = Array.isArray(p.directions) && p.directions.includes(role);
+                                return (
+                                  <label key={role} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                                    <input
+                                      type="checkbox"
+                                      className="rounded border-gray-300 text-blue-600 dark:border-gray-700 dark:bg-gray-900"
+                                      checked={hasRole}
+                                      onChange={() => void togglePersonDirection(p, role)}
+                                    />
+                                    {label}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <span
@@ -953,10 +1116,10 @@ export function SettingsPage() {
                         </td>
                       </tr>
                     ))}
-                  {people.filter((p) => p.person_type === 'specialist').length === 0 ? (
+                  {people.filter((p) => peopleFilter === 'all' || p.person_type === peopleFilter).length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
-                        Спеціалісти відсутні. Додайте першого спеціаліста вище.
+                        Працівники відсутні. Додайте першого працівника вище.
                       </td>
                     </tr>
                   ) : null}
