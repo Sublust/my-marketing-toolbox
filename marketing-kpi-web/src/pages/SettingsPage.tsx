@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PeriodPicker } from '../components/PeriodPicker'
 import { useAuth } from '../context/AuthProvider'
+import { getCanonicalFullName } from '../lib/personUtils'
 import { supabase } from '../lib/supabaseClient'
 import type { DbCategoryWeight, DbPeriod, DbPerson, DbProject, DbUserProfile, TaskRole } from '../lib/types'
 
@@ -224,6 +225,45 @@ export function SettingsPage() {
       return
     }
     setPeople((prev) => prev.map((x) => (x.id === p.id ? { ...x, directions: newDirections } : x)))
+  }
+
+  const [isStandardizing, setIsStandardizing] = useState(false)
+  const [standardizeMsg, setStandardizeMsg] = useState<string | null>(null)
+
+  const standardizeAllNames = async () => {
+    if (!isAdmin) return
+    setIsStandardizing(true)
+    setStandardizeMsg(null)
+    try {
+      // 1. Update people table with canonical full names
+      for (const p of people) {
+        const canonical = getCanonicalFullName(p.full_name)
+        if (canonical && canonical !== p.full_name) {
+          await supabase.from('people').update({ full_name: canonical }).eq('id', p.id)
+        }
+      }
+      // 2. Update projects table pm_name with canonical full names
+      for (const proj of projects) {
+        if (proj.pm_name) {
+          const canonicalPm = getCanonicalFullName(proj.pm_name)
+          if (canonicalPm && canonicalPm !== proj.pm_name) {
+            await supabase.from('projects').update({ pm_name: canonicalPm }).eq('id', proj.id)
+          }
+        }
+      }
+      // Refresh local lists
+      const [{ data: ppl }, { data: prj }] = await Promise.all([
+        supabase.from('people').select('*').order('full_name'),
+        supabase.from('projects').select('*').order('name'),
+      ])
+      if (ppl) setPeople(ppl as DbPerson[])
+      if (prj) setProjects(prj as DbProject[])
+      setStandardizeMsg("Усі імена та прізвища успішно уніфіковано в системі!")
+    } catch (e: any) {
+      setStandardizeMsg(`Помилка: ${e.message}`)
+    } finally {
+      setIsStandardizing(false)
+    }
   }
 
   const createCurrentPeriod = async () => {
@@ -769,10 +809,28 @@ export function SettingsPage() {
 
           {/* Specialists section */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-            <div className="text-sm font-semibold text-gray-900 dark:text-white">Спеціалісти</div>
-            <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Додавання нових спеціалістів, налаштування напрямків роботи та статус активності.
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">Спеціалісти</div>
+                <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  Додавання нових спеціалістів, налаштування напрямків роботи та статус активності.
+                </div>
+              </div>
+              <button
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300 disabled:opacity-50 transition-colors shrink-0"
+                onClick={() => void standardizeAllNames()}
+                disabled={isStandardizing}
+                title="Оновити всі скорочені імена в базі даних до повного формату (Ім'я + Прізвище)"
+              >
+                {isStandardizing ? "Уніфікую..." : "✨ Уніфікувати всі імена (Ім'я + Прізвище)"}
+              </button>
             </div>
+
+            {standardizeMsg ? (
+              <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+                {standardizeMsg}
+              </div>
+            ) : null}
 
             {specsError ? (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
@@ -848,7 +906,7 @@ export function SettingsPage() {
                     .filter((p) => p.person_type === 'specialist')
                     .map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{p.full_name}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{getCanonicalFullName(p.full_name)}</td>
                         <td className="px-4 py-3 text-sm">
                           <div className="flex flex-wrap gap-4">
                             {(['seo', 'context', 'target', 'tiktok'] as const).map((role) => {

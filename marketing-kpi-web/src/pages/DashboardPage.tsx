@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts'
 import { calculateKpi } from '../domain/kpiEngine'
+import { getCanonicalFullName } from '../lib/personUtils'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabaseClient'
 import type {
@@ -862,11 +863,14 @@ export function DashboardPage() {
                 onChange={(e) => setSpecialistId(e.target.value)}
               >
                 <option value="">Спеціаліст: оберіть…</option>
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}{p.is_active ? '' : ' (не працює)'}
-                  </option>
-                ))}
+                {people.map((p) => {
+                  const canonicalName = getCanonicalFullName(p.full_name)
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {canonicalName}{p.is_active ? '' : ' (не працює)'}
+                    </option>
+                  )
+                })}
               </select>
             ) : null}
 
@@ -879,7 +883,7 @@ export function DashboardPage() {
                 <option value="">PM: оберіть…</option>
                 {pmOptions.map((n) => (
                   <option key={n.id} value={n.id}>
-                    {n.name}
+                    {getCanonicalFullName(n.name)}
                   </option>
                 ))}
               </select>

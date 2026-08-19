@@ -129,7 +129,7 @@ export function calculateKpi(params: {
       specialistStats[spec].details.push({
         projectName: project.name,
         roleName:
-          spec === 'Таня' || spec === 'Макс'
+          spec === 'Таня' || spec === 'Макс' || spec === 'Тетяна Мельник' || spec === 'Максим Дерій' || spec.toLowerCase().includes('дерій') || spec.toLowerCase().includes('мельник')
             ? role === 'target'
               ? 'Target'
               : role === 'tiktok'

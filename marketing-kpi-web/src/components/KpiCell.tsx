@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { DbPerson, KpiScore, TaskRole } from '../lib/types'
+import { getCanonicalFullName } from '../lib/personUtils'
 
 export type KpiCellValue = {
   specialistId: string | null
@@ -26,10 +27,13 @@ export function KpiCell(props: {
 
     return [
       { id: '', label: '-' },
-      ...filtered.map((s) => ({
-        id: s.id,
-        label: s.is_active ? s.full_name : `${s.full_name} (не працює)`
-      }))
+      ...filtered.map((s) => {
+        const canonicalName = getCanonicalFullName(s.full_name)
+        return {
+          id: s.id,
+          label: s.is_active ? canonicalName : `${canonicalName} (не працює)`
+        }
+      })
     ]
   }, [props.specialists, props.role, props.value.specialistId])
 

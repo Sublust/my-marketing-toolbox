@@ -34,6 +34,7 @@ import {
   DEFAULT_ROLE_THRESHOLDS,
 } from '../domain/salaryEngine'
 import { computeProjectSuccess } from '../domain/kpiEngine'
+import { getCanonicalFullName, areSamePerson } from '../lib/personUtils'
 import { supabase } from '../lib/supabaseClient'
 import type { DbKpiRecord, DbPeriod, DbPerson, DbProject, DbUserProfile, ProjectCategory, TaskRole } from '../lib/types'
 
@@ -347,22 +348,7 @@ export function SalaryLabPage() {
 
     const empMap = new Map<string, EmployeeInput>()
 
-    // Helper for flexible name matching (e.g. 'Аня' vs 'Аня Джура', 'Макс' vs 'Максим Дерій')
-    const matchNames = (nameA: string, nameB: string): boolean => {
-      const a = nameA.trim().toLowerCase()
-      const b = nameB.trim().toLowerCase()
-      if (a === b) return true
-      const firstA = a.split(' ')[0]
-      const firstB = b.split(' ')[0]
-      if (firstA && firstB) {
-        if (firstA === firstB) return true
-        if (a.includes(firstB) || b.includes(firstA)) return true
-        if (firstA.slice(0, 3) === firstB.slice(0, 3)) return true
-      }
-      return false
-    }
-
-    // Helper to resolve specialist person from kpi_record via ID or fuzzy lookup
+    // Helper to resolve specialist person from kpi_record via ID or canonical lookup
     const findSpecialistPerson = (rec: DbKpiRecord): DbPerson | null => {
       if (rec.specialist_person_id && peopleById[rec.specialist_person_id]) {
         return peopleById[rec.specialist_person_id]
@@ -371,7 +357,7 @@ export function SalaryLabPage() {
         if (peopleById[rec.specialist_id]) return peopleById[rec.specialist_id]
         const userObj = usersById[rec.specialist_id]
         if (userObj?.full_name) {
-          const matched = activePeople.find((p) => matchNames(p.full_name, userObj.full_name))
+          const matched = activePeople.find((p) => areSamePerson(p.full_name, userObj.full_name))
           if (matched) return matched
         }
       }
@@ -384,7 +370,7 @@ export function SalaryLabPage() {
       if (proj.pm_id && peopleById[proj.pm_id]) return peopleById[proj.pm_id]
       if (proj.pm_name) {
         const normPm = proj.pm_name.trim()
-        const matched = activePeople.find((p) => matchNames(p.full_name, normPm))
+        const matched = activePeople.find((p) => areSamePerson(p.full_name, normPm))
         if (matched) return matched
       }
       return null
@@ -416,13 +402,15 @@ export function SalaryLabPage() {
       const pmPerson = findPmPerson(proj)
       if (!pmPerson) continue
 
+      const canonicalName = getCanonicalFullName(pmPerson.full_name)
+
       if (!empMap.has(pmPerson.id)) {
         let defaultGrade: EmployeeGrade = 'Middle'
         if (employeeGrades[pmPerson.id]) defaultGrade = employeeGrades[pmPerson.id]
 
         empMap.set(pmPerson.id, {
           id: pmPerson.id,
-          name: pmPerson.full_name,
+          name: canonicalName,
           roleCategory: 'pm',
           grade: defaultGrade,
           assignments: [],
@@ -452,6 +440,8 @@ export function SalaryLabPage() {
       const proj = projectsById[rec.project_id]
       if (!person || !proj) continue
 
+      const canonicalName = getCanonicalFullName(person.full_name)
+
       if (!empMap.has(person.id)) {
         let roleCategory: EmployeeRoleCategory = 'seo'
         if (rec.task_role === 'target' || rec.task_role === 'tiktok') roleCategory = 'target'
@@ -472,7 +462,7 @@ export function SalaryLabPage() {
 
         empMap.set(person.id, {
           id: person.id,
-          name: person.full_name,
+          name: canonicalName,
           roleCategory,
           grade: defaultGrade,
           assignments: [],
@@ -496,6 +486,7 @@ export function SalaryLabPage() {
     // C) Also ensure all active specialists from people table are listed
     for (const person of activePeople) {
       if (person.person_type === 'specialist' && !empMap.has(person.id)) {
+        const canonicalName = getCanonicalFullName(person.full_name)
         let roleCategory: EmployeeRoleCategory = 'seo'
         if (person.directions?.includes('target') || person.directions?.includes('tiktok')) roleCategory = 'target'
         else if (person.directions?.includes('context')) roleCategory = 'context'
@@ -514,7 +505,7 @@ export function SalaryLabPage() {
 
         empMap.set(person.id, {
           id: person.id,
-          name: person.full_name,
+          name: canonicalName,
           roleCategory,
           grade: defaultGrade,
           assignments: [],

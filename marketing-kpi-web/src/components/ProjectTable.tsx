@@ -1,4 +1,5 @@
 import type { DbPerson, DbProject, DbUserProfile, TaskRole } from '../lib/types'
+import { getCanonicalFullName } from '../lib/personUtils'
 import { KpiCell, type KpiCellValue } from './KpiCell'
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
 
@@ -102,11 +103,12 @@ export function ProjectTable(props: {
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
           {props.projects.map((p) => {
-            const pmName = p.pm_name?.trim()
+            const rawPm = p.pm_name?.trim()
               ? p.pm_name
               : p.pm_id
                 ? props.pmUsersById[p.pm_id]?.full_name
                 : null
+            const pmName = getCanonicalFullName(rawPm)
             const canEdit = props.canEditProject(p)
 
             return (
