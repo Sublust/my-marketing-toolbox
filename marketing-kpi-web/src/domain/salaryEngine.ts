@@ -8,8 +8,8 @@ export type LoadLevel = 'Low' | 'Medium' | 'High'
 export type CategoryWeights = Record<ProjectCategory, number>
 
 export type RoleThreshold = {
-  lowMax: number  // points < lowMax => Low
-  medMax: number  // points <= medMax => Medium, > medMax => High
+  lowMax: number // points < lowMax => Low
+  medMax: number // points <= medMax => Medium, > medMax => High
 }
 
 export type RoleThresholds = Record<EmployeeRoleCategory, RoleThreshold>
@@ -112,6 +112,7 @@ export type CalculatedEmployeeSalary = {
   baseRate: number
   projectBonus: number
   maxKpiBudget: number
+  overallKpiPercent: number // Weighted KPI execution percentage
   earnedKpiBonus: number
   totalSalary: number
   projectDetails: ProjectSalaryDetail[]
@@ -120,7 +121,7 @@ export type CalculatedEmployeeSalary = {
 export function getPayoutMultiplier(score: KpiScore | number): { scorePercent: number; payoutPercent: number } {
   let scorePercent = 0
   if (typeof score === 'number') {
-    scorePercent = score
+    scorePercent = Math.max(0, Math.min(100, score))
   } else if (score === '1') {
     scorePercent = 100
   } else if (score === 'ж') {
@@ -246,11 +247,14 @@ export function calculateEmployeeSalary(
 
   // Allocate KPI Budget per project & calculate earned KPI bonus
   let totalEarnedKpiBonus = 0
+  let weightedSuccessScore = 0
+
   if (totalPoints > 0) {
     projectDetails = projectDetails.map((detail) => {
       const allocatedKpiBudget = maxKpiBudget * (detail.effectivePoints / totalPoints)
       const earnedKpiBonus = allocatedKpiBudget * detail.payoutPercent
       totalEarnedKpiBonus += earnedKpiBonus
+      weightedSuccessScore += (detail.scorePercent / 100) * detail.effectivePoints
 
       return {
         ...detail,
@@ -259,6 +263,9 @@ export function calculateEmployeeSalary(
       }
     })
   }
+
+  const overallKpiPercent =
+    totalPoints > 0 ? Math.round((weightedSuccessScore / totalPoints) * 1000) / 10 : 100
 
   const roundedEarnedKpi = Math.round(totalEarnedKpiBonus * 100) / 100
   const totalSalary = Math.round((baseRate + projectBonus + roundedEarnedKpi) * 100) / 100
@@ -273,6 +280,7 @@ export function calculateEmployeeSalary(
     baseRate,
     projectBonus,
     maxKpiBudget,
+    overallKpiPercent,
     earnedKpiBonus: roundedEarnedKpi,
     totalSalary,
     projectDetails,

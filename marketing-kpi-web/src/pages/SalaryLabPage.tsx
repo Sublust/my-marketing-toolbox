@@ -1,12 +1,14 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Calculator,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Database,
   DollarSign,
   FileSpreadsheet,
   GitFork,
+  HelpCircle,
   Layers,
   RotateCcw,
   Sliders,
@@ -14,6 +16,7 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  XCircle,
 } from 'lucide-react'
 import { PeriodPicker } from '../components/PeriodPicker'
 import type {
@@ -30,10 +33,28 @@ import {
   DEFAULT_GRADE_GRIDS,
   DEFAULT_ROLE_THRESHOLDS,
 } from '../domain/salaryEngine'
+import { computeProjectSuccess } from '../domain/kpiEngine'
 import { supabase } from '../lib/supabaseClient'
 import type { DbKpiRecord, DbPeriod, DbPerson, DbProject, DbUserProfile, ProjectCategory, TaskRole } from '../lib/types'
 
-// Mock reference data from reglament CSVs for realistic testing
+// LocalStorage Keys for complete persistence
+const LS_CATEGORY_WEIGHTS = 'salary_lab_category_weights'
+const LS_ROLE_THRESHOLDS = 'salary_lab_role_thresholds'
+const LS_EMPLOYEE_GRADES = 'salary_lab_employee_grades'
+const LS_PARENT_MAP = 'salary_lab_parent_project_map'
+const LS_VIEW_MODE = 'salary_lab_view_mode'
+
+// Default parent project relationships mapping
+const DEFAULT_PARENT_PROJECT_MAP: Record<string, string> = {
+  'Соларей': 'HealthFit',
+  'Майнд Ші': 'HealthFit',
+  'DNS': 'HealthFit',
+  'Модний доктор (TikTok)': 'Модний доктор (Meta)',
+  'stimma (TikTok)': 'stimma (Meta)',
+  'Бренд A (TikTok)': 'Бренд A (Meta)',
+}
+
+// Mock reference data from reglament CSVs for realistic demonstration
 const DEMO_EMPLOYEES: EmployeeInput[] = [
   {
     id: 'demo-1',
@@ -131,38 +152,109 @@ const DEMO_EMPLOYEES: EmployeeInput[] = [
   },
 ]
 
-// Default parent project relationships mapping
-const DEFAULT_PARENT_PROJECT_MAP: Record<string, string> = {
-  'Соларей': 'HealthFit',
-  'Майнд Ші': 'HealthFit',
-  'DNS': 'HealthFit',
-  'Модний доктор (TikTok)': 'Модний доктор (Meta)',
-  'stimma (TikTok)': 'stimma (Meta)',
-  'Бренд A (TikTok)': 'Бренд A (Meta)',
-}
-
 export function SalaryLabPage() {
   const [period, setPeriod] = useState<DbPeriod | null>(null)
   const [useDemoData, setUseDemoData] = useState<boolean>(false)
 
-  // Real DB state
+  // Real DB raw states
   const [projects, setProjects] = useState<DbProject[]>([])
   const [people, setPeople] = useState<DbPerson[]>([])
   const [users, setUsers] = useState<DbUserProfile[]>([])
   const [kpiRecords, setKpiRecords] = useState<DbKpiRecord[]>([])
   const [allKpiRecords, setAllKpiRecords] = useState<DbKpiRecord[]>([])
 
-  // Dynamic configuration controls
-  const [categoryWeights, setCategoryWeights] = useState<CategoryWeights>(DEFAULT_CATEGORY_WEIGHTS)
-  const [roleThresholds, setRoleThresholds] = useState<RoleThresholds>(DEFAULT_ROLE_THRESHOLDS)
-  const [parentProjectMap, setParentProjectMap] = useState<Record<string, string>>(DEFAULT_PARENT_PROJECT_MAP)
-  const [employeeGrades, setEmployeeGrades] = useState<Record<string, EmployeeGrade>>({})
-  const [activeViewOption, setActiveViewOption] = useState<'A' | 'B' | 'compare'>('compare')
+  // Persisted Dynamic Configuration Controls
+  const [categoryWeights, setCategoryWeights] = useState<CategoryWeights>(() => {
+    try {
+      const saved = localStorage.getItem(LS_CATEGORY_WEIGHTS)
+      return saved ? JSON.parse(saved) : DEFAULT_CATEGORY_WEIGHTS
+    } catch {
+      return DEFAULT_CATEGORY_WEIGHTS
+    }
+  })
+
+  const [roleThresholds, setRoleThresholds] = useState<RoleThresholds>(() => {
+    try {
+      const saved = localStorage.getItem(LS_ROLE_THRESHOLDS)
+      return saved ? JSON.parse(saved) : DEFAULT_ROLE_THRESHOLDS
+    } catch {
+      return DEFAULT_ROLE_THRESHOLDS
+    }
+  })
+
+  const [parentProjectMap, setParentProjectMap] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem(LS_PARENT_MAP)
+      return saved ? JSON.parse(saved) : DEFAULT_PARENT_PROJECT_MAP
+    } catch {
+      return DEFAULT_PARENT_PROJECT_MAP
+    }
+  })
+
+  const [employeeGrades, setEmployeeGrades] = useState<Record<string, EmployeeGrade>>(() => {
+    try {
+      const saved = localStorage.getItem(LS_EMPLOYEE_GRADES)
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  const [activeViewOption, setActiveViewOption] = useState<'A' | 'B' | 'compare'>(() => {
+    try {
+      const saved = localStorage.getItem(LS_VIEW_MODE) as 'A' | 'B' | 'compare'
+      return saved || 'compare'
+    } catch {
+      return 'compare'
+    }
+  })
+
   const [showConfigPanel, setShowConfigPanel] = useState<boolean>(true)
   const [showParentMappingPanel, setShowParentMappingPanel] = useState<boolean>(false)
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null)
 
-  // Load all projects, people, users, and overall kpi_records on initial mount
+  // Sync states to LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_CATEGORY_WEIGHTS, JSON.stringify(categoryWeights))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [categoryWeights])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_ROLE_THRESHOLDS, JSON.stringify(roleThresholds))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [roleThresholds])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_PARENT_MAP, JSON.stringify(parentProjectMap))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [parentProjectMap])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_EMPLOYEE_GRADES, JSON.stringify(employeeGrades))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [employeeGrades])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_VIEW_MODE, activeViewOption)
+    } catch (e) {
+      console.error(e)
+    }
+  }, [activeViewOption])
+
+  // Load all projects, people, users, and overall records on mount
   useEffect(() => {
     async function initDbData() {
       try {
@@ -177,7 +269,7 @@ export function SalaryLabPage() {
         if (usersRes.data) setUsers(usersRes.data as DbUserProfile[])
         if (allRecsRes.data) setAllKpiRecords(allRecsRes.data as DbKpiRecord[])
       } catch (err) {
-        console.error('Error initializing database projects/people/users:', err)
+        console.error('Error initializing database data:', err)
       }
     }
 
@@ -216,7 +308,7 @@ export function SalaryLabPage() {
     initLatestPeriod()
   }, [period])
 
-  // Load database KPI records for selected period
+  // Load database KPI records whenever period changes
   useEffect(() => {
     async function loadPeriodData() {
       if (!period?.id || useDemoData) return
@@ -231,7 +323,7 @@ export function SalaryLabPage() {
     loadPeriodData()
   }, [period, useDemoData])
 
-  // Build employee list from DB (STRICTLY ACTIVE WORKING EMPLOYEES) or fallback to Demo Data
+  // Build employee list from DB (STRICTLY ACTIVE WORKING EMPLOYEES)
   const employees: EmployeeInput[] = useMemo(() => {
     if (useDemoData) {
       return DEMO_EMPLOYEES.map((emp) => ({
@@ -249,7 +341,7 @@ export function SalaryLabPage() {
     const peopleById = Object.fromEntries(activePeople.map((p) => [p.id, p]))
     const usersById = Object.fromEntries(users.map((u) => [u.id, u]))
 
-    // Include ALL projects (active & historical for the period)
+    // Include ALL projects (active & historical) so historical records are not lost
     const projectsById = Object.fromEntries(projects.map((pr) => [pr.id, pr]))
     const activeProjects = projects.filter((p) => p.is_active !== false)
 
@@ -270,7 +362,7 @@ export function SalaryLabPage() {
       return false
     }
 
-    // Helper to resolve specialist person from kpi_record via ID or fuzzy name lookup
+    // Helper to resolve specialist person from kpi_record via ID or fuzzy lookup
     const findSpecialistPerson = (rec: DbKpiRecord): DbPerson | null => {
       if (rec.specialist_person_id && peopleById[rec.specialist_person_id]) {
         return peopleById[rec.specialist_person_id]
@@ -313,14 +405,13 @@ export function SalaryLabPage() {
       }
 
       if (green + yellow + red === 0) return 100
-      if (red > 0 && green === 0 && yellow === 0) return 0
-      if (red > green + yellow) return 0
-      if (yellow > 0 && green === 0) return 80
-      if (green > 0) return 100
+      const isSuccess = computeProjectSuccess(green, yellow, red)
+      if (isSuccess === true) return 100
+      if (isSuccess === false) return 0
       return 50
     }
 
-    // A) Process PM assignments across ALL active projects in database
+    // A) Process PM assignments across active projects in database
     for (const proj of activeProjects) {
       const pmPerson = findPmPerson(proj)
       if (!pmPerson) continue
@@ -391,7 +482,6 @@ export function SalaryLabPage() {
       const emp = empMap.get(person.id)!
       const exists = emp.assignments.some((a) => a.projectId === proj.id && a.taskRole === rec.task_role)
       if (!exists) {
-        // If Period kpiRecords has this record, use its score; otherwise default score
         const scoreVal = kpiRecords.length > 0 ? rec.score : '1'
         emp.assignments.push({
           projectId: proj.id,
@@ -496,11 +586,20 @@ export function SalaryLabPage() {
     }
   }, [employees, categoryWeights, roleThresholds, parentProjectMap])
 
+  // Complete Reset of settings to Defaults
   const resetConfig = () => {
     setCategoryWeights(DEFAULT_CATEGORY_WEIGHTS)
     setRoleThresholds(DEFAULT_ROLE_THRESHOLDS)
     setParentProjectMap(DEFAULT_PARENT_PROJECT_MAP)
     setEmployeeGrades({})
+    try {
+      localStorage.removeItem(LS_CATEGORY_WEIGHTS)
+      localStorage.removeItem(LS_ROLE_THRESHOLDS)
+      localStorage.removeItem(LS_PARENT_MAP)
+      localStorage.removeItem(LS_EMPLOYEE_GRADES)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   return (
@@ -518,7 +617,7 @@ export function SalaryLabPage() {
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Моделювання та випробування нових регламентів нарахування заробітної плати для діючих працівників з можливості ручного коригування грейдів, коефіцієнтів та меж навантаження.
+              Моделювання та випробування нових регламентів нарахування заробітної плати для діючих працівників з автозбереженням грейдів, коефіцієнтів та меж навантаження.
             </p>
           </div>
 
@@ -553,7 +652,7 @@ export function SalaryLabPage() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                Параметри симуляції та коефіцієнти
+                Параметри симуляції та коефіцієнти (Зберігаються автоматично)
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Зміна вагових коефіцієнтів проєктів та меж навантаження по ролях
@@ -567,9 +666,10 @@ export function SalaryLabPage() {
                 resetConfig()
               }}
               className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300"
+              title="Скинути коефіцієнти, пороги та грейди до стандартних значень регламенту"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Скинути
+              Скинути до стандартних
             </button>
             {showConfigPanel ? <ChevronDown className="h-5 w-5 text-gray-400" /> : <ChevronRight className="h-5 w-5 text-gray-400" />}
           </div>
@@ -820,7 +920,7 @@ export function SalaryLabPage() {
           <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-50">
             {calculatedData.totalSalaryB} <span className="text-xs font-normal text-gray-500">тис. грн</span>
           </div>
-          <p className="mt-1 text-[11px] text-gray-400">З дисконтом 50% на материнські/дочірні проєкти</p>
+          <p className="mt-1 text-[11px] text-gray-400">З дисконтом 50% на мультиканали/групи</p>
         </div>
 
         {/* Card 3: Difference A vs B */}
@@ -855,7 +955,7 @@ export function SalaryLabPage() {
           <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-50">
             {employees.length} <span className="text-xs font-normal text-gray-500">осіб</span>
           </div>
-          <p className="mt-1 text-[11px] text-gray-400">Активні співробітники</p>
+          <p className="mt-1 text-[11px] text-gray-400">Активні співробітники команди</p>
         </div>
       </div>
 
@@ -867,7 +967,7 @@ export function SalaryLabPage() {
               Детальний розрахунок по працюючих працівниках ({employees.length} осіб)
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Оберіть Грейд працівника (Junior/Middle/Senior) або натисніть на рядок, щоб розгорнути деталізацію
+              Оберіть Грейд працівника (Junior/Middle/Senior) або натисніть на рядок, щоб розгорнути деталізацію проєктів
             </p>
           </div>
         </div>
@@ -876,15 +976,16 @@ export function SalaryLabPage() {
           <table className="w-full text-left text-xs table-fixed min-w-[760px]">
             <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 font-semibold uppercase tracking-wider">
               <tr>
-                <th className="px-4 py-3 text-left w-48">Співробітник</th>
-                <th className="px-3 py-3 text-left w-44">Грейд / Роль</th>
+                <th className="px-4 py-3 text-left w-44">Співробітник</th>
+                <th className="px-3 py-3 text-left w-40">Грейд / Роль</th>
                 <th className="px-3 py-3 text-center w-32">Бали навантаження</th>
-                <th className="px-3 py-3 text-center w-24">Рівень</th>
-                <th className="px-3 py-3 text-right w-20">Ставка</th>
-                <th className="px-3 py-3 text-right w-24">Проєктна ч.</th>
+                <th className="px-3 py-3 text-center w-20">Рівень</th>
+                <th className="px-3 py-3 text-center w-24">KPI %</th>
+                <th className="px-3 py-3 text-right w-16">Ставка</th>
+                <th className="px-3 py-3 text-right w-20">Проєктна ч.</th>
                 <th className="px-3 py-3 text-right w-24">KPI Бонус</th>
                 <th className="px-4 py-3 text-right w-28 font-bold">Разом ЗП</th>
-                {activeViewOption === 'compare' && <th className="px-4 py-3 text-right w-32">Різниця (B - A)</th>}
+                {activeViewOption === 'compare' && <th className="px-4 py-3 text-right w-28">Різниця (B - A)</th>}
               </tr>
             </thead>
 
@@ -963,6 +1064,20 @@ export function SalaryLabPage() {
                         </span>
                       </td>
 
+                      <td className="px-3 py-3.5 text-center font-mono font-semibold">
+                        <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                          activeEmp.overallKpiPercent >= 90
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                            : activeEmp.overallKpiPercent >= 75
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                            : activeEmp.overallKpiPercent >= 50
+                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300'
+                            : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+                        }`}>
+                          {activeEmp.overallKpiPercent}%
+                        </span>
+                      </td>
+
                       <td className="px-3 py-3.5 text-right font-mono">{activeEmp.baseRate}</td>
                       <td className="px-3 py-3.5 text-right font-mono">{activeEmp.projectBonus}</td>
                       <td className="px-3 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400">
@@ -993,7 +1108,7 @@ export function SalaryLabPage() {
                     {/* Expandable Project Breakdown Details */}
                     {isExpanded && (
                       <tr>
-                        <td colSpan={activeViewOption === 'compare' ? 9 : 8} className="bg-gray-50/80 p-4 dark:bg-gray-950/60">
+                        <td colSpan={activeViewOption === 'compare' ? 10 : 9} className="bg-gray-50/80 p-4 dark:bg-gray-950/60">
                           <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-inner dark:border-gray-800 dark:bg-gray-900">
                             <div className="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300">
                               <span>Закріплені проєкти та розрахований KPI бонус ({activeEmp.name}) — всього {activeEmp.projectDetails.length} проєктів</span>
@@ -1004,7 +1119,7 @@ export function SalaryLabPage() {
                               <thead className="border-b border-gray-200 text-gray-500 dark:border-gray-800 font-semibold">
                                 <tr>
                                   <th className="py-2">Проєкт</th>
-                                  <th className="py-2">Материнський проєкти</th>
+                                  <th className="py-2">Материнський проєкт</th>
                                   <th className="py-2">Категорія</th>
                                   <th className="py-2 text-center">Базова вага</th>
                                   <th className="py-2 text-center">Дисконт 50%</th>
@@ -1048,13 +1163,20 @@ export function SalaryLabPage() {
                                     </td>
                                     <td className="py-2 text-center font-mono font-bold">{det.effectivePoints}</td>
                                     <td className="py-2 text-center font-mono">
-                                      <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                      <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${
                                         det.payoutPercent === 1
                                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
                                           : det.payoutPercent > 0
                                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
                                           : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
                                       }`}>
+                                        {det.payoutPercent === 1 ? (
+                                          <CheckCircle2 className="h-3 w-3" />
+                                        ) : det.payoutPercent > 0 ? (
+                                          <HelpCircle className="h-3 w-3" />
+                                        ) : (
+                                          <XCircle className="h-3 w-3" />
+                                        )}
                                         {det.scorePercent}% ({det.payoutPercent * 100}% виплати)
                                       </span>
                                     </td>
