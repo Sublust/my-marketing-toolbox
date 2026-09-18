@@ -180,6 +180,26 @@ function renderModules() {
             Щомісячні опції (впливають на щомісячний чек):
           </div>
           ${channel.addons.monthly.map(a => {
+            const isIncluded = a.includedIn && a.includedIn.includes(selectedTierId);
+            if (isIncluded) {
+              return `
+                <div class="addon-row-light" style="background:#f0fdf4; border-color:#bbf7d0;">
+                  <div class="addon-left">
+                    <input type="checkbox" id="${chId}_${a.id}" checked disabled style="width:16px; height:16px; cursor:not-allowed;" />
+                    <label for="${chId}_${a.id}" class="addon-title" style="color:var(--text-main); cursor:default;">
+                      ${a.name}
+                      <span class="badge-included"><i class="fa-solid fa-circle-check"></i> Включено в ${currentTier.name}</span>
+                    </label>
+                    <button class="btn-pm-info" data-title="${a.name}" data-info="${a.info}" title="Довідка">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                  </div>
+                  <div class="addon-right">
+                    <span class="addon-price" style="color:var(--good); font-size:12px; font-weight:800;">0 ₴ (включено)</span>
+                  </div>
+                </div>
+              `;
+            }
             if (a.type === 'counter') {
               const val = (state.addons[chId] && state.addons[chId][a.id]) || 0;
               return `
@@ -224,6 +244,26 @@ function renderModules() {
             Разові технічні рішення (One-time Setup):
           </div>
           ${channel.addons.onetime.map(a => {
+            const isIncluded = a.includedIn && a.includedIn.includes(selectedTierId);
+            if (isIncluded) {
+              return `
+                <div class="addon-row-light" style="background:#f0fdf4; border-color:#bbf7d0;">
+                  <div class="addon-left">
+                    <input type="checkbox" id="${chId}_${a.id}" checked disabled style="width:16px; height:16px; cursor:not-allowed;" />
+                    <label for="${chId}_${a.id}" class="addon-title" style="color:var(--text-main); cursor:default;">
+                      ${a.name}
+                      <span class="badge-included"><i class="fa-solid fa-circle-check"></i> Включено в ${currentTier.name}</span>
+                    </label>
+                    <button class="btn-pm-info" data-title="${a.name}" data-info="${a.info}" title="Довідка">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                  </div>
+                  <div class="addon-right">
+                    <span class="addon-price" style="color:var(--good); font-size:12px; font-weight:800;">0 ₴ (включено)</span>
+                  </div>
+                </div>
+              `;
+            }
             const isChecked = state.addons[chId] && state.addons[chId][a.id];
             return `
               <div class="addon-row-light">
@@ -315,7 +355,8 @@ function calculateTotals() {
 
     // Onetime Addons
     channel.addons.onetime.forEach(a => {
-      if (state.addons[chId] && state.addons[chId][a.id]) {
+      const isIncluded = a.includedIn && a.includedIn.includes(tierId);
+      if (!isIncluded && state.addons[chId] && state.addons[chId][a.id]) {
         totalSetup += a.price;
       }
     });
@@ -325,6 +366,8 @@ function calculateTotals() {
 
     // Monthly Addons
     channel.addons.monthly.forEach(a => {
+      const isIncluded = a.includedIn && a.includedIn.includes(tierId);
+      if (isIncluded) return;
       if (a.type === 'counter') {
         const count = (state.addons[chId] && state.addons[chId][a.id]) || 0;
         totalMonthly += count * a.price;
@@ -427,22 +470,32 @@ function generateWorksectionSpec() {
     const ch = CHANNELS[chId];
     const t = ch.tiers[state.tiers[chId] || 'pro'];
     spec += `\n▶ [${ch.name.toUpperCase()}] Тариф: ${t.name} (${formatUah(t.monthlyPrice)}/міс.)\n`;
-    spec += `  • Напрямки бізнесу: ${t.limits.streams}\n`;
+    spec += `  • Напрямки бізнесу / цілі: ${t.limits.streams}\n`;
+    spec += `  • Структура кампаній: ${t.limits.structure}\n`;
     spec += `  • Статичні банери: до ${t.limits.staticPlots} сюжетів (формати: ${t.limits.staticFormats} — до ${t.limits.staticFilesTotal} файлів)\n`;
     if (chId === 'meta') {
       spec += `  • Відео клієнта: до ${t.limits.readyVideos} змонтованих роликів (Safe Zones 4:5/9:16/1:1 + плашки. БЕЗ МОНТАЖУ)\n`;
       spec += `  • Лідогенерація: миттєве сповіщення в Telegram через Make\n`;
     } else {
-      spec += `  • Відео: завантажує замовник на свій YouTube\n`;
+      spec += `  • Відео: ${t.limits.readyVideos > 0 ? `до ${t.limits.readyVideos} роликів супроводу та адаптації` : 'завантажує замовник на свій YouTube (адаптація як Add-on)'}\n`;
     }
     spec += `  • Звітність: ${t.limits.reporting}\n`;
 
+    // Included perks for this tier
+    const includedOnetime = ch.addons.onetime.filter(a => a.includedIn && a.includedIn.includes(t.id));
+    const includedMonthly = ch.addons.monthly.filter(a => a.includedIn && a.includedIn.includes(t.id));
+    if (includedOnetime.length > 0 || includedMonthly.length > 0) {
+      spec += `  • Включено в пакет (без доплат):\n`;
+      includedOnetime.forEach(a => spec += `    ✓ [Разово] ${a.name} (0 ₴ замість ${formatUah(a.price)})\n`);
+      includedMonthly.forEach(a => spec += `    ✓ [Щомісяця] ${a.name} (0 ₴ замість ${formatUah(a.price)}/міс.)\n`);
+    }
+
     // Add-ons for this channel
-    const onetimeSelected = ch.addons.onetime.filter(a => state.addons[chId] && state.addons[chId][a.id]);
-    const monthlySelected = ch.addons.monthly.filter(a => (a.type === 'counter' ? state.addons[chId] && state.addons[chId][a.id] > 0 : state.addons[chId] && state.addons[chId][a.id]));
+    const onetimeSelected = ch.addons.onetime.filter(a => !(a.includedIn && a.includedIn.includes(t.id)) && state.addons[chId] && state.addons[chId][a.id]);
+    const monthlySelected = ch.addons.monthly.filter(a => !(a.includedIn && a.includedIn.includes(t.id)) && (a.type === 'counter' ? state.addons[chId] && state.addons[chId][a.id] > 0 : state.addons[chId] && state.addons[chId][a.id]));
 
     if (onetimeSelected.length > 0 || monthlySelected.length > 0) {
-      spec += `  • Активні Add-ons:\n`;
+      spec += `  • Додатково обрані Add-ons:\n`;
       onetimeSelected.forEach(a => spec += `    + [Разово] ${a.name} (+${formatUah(a.price)})\n`);
       monthlySelected.forEach(a => {
         if (a.type === 'counter') {
@@ -477,10 +530,16 @@ function generateClientKp() {
     const ch = CHANNELS[chId];
     const t = ch.tiers[state.tiers[chId] || 'pro'];
     kp += `✅ ${ch.name} — Пакет ${t.name}\n`;
-    kp += `   Обсяг: ${t.limits.streams}; дизайн-стандарт: до ${t.limits.staticPlots} сюжетів у 3 форматах (1:1, 4:5, 9:16 — разом до ${t.limits.staticFilesTotal} файлів щомісяця).\n`;
+    kp += `   Обсяг: ${t.limits.streams}; дизайн-стандарт: до ${t.limits.staticPlots} сюжетів у 3 форматах (${chId === 'meta' ? '1:1, 4:5, 9:16' : '1.91:1, 1:1, 4:5/9:16'} — разом до ${t.limits.staticFilesTotal} файлів щомісяця).\n`;
     if (chId === 'meta') {
       kp += `   Відео: технічна адаптація до ${t.limits.readyVideos} ваших змонтованих роликів під формати стрічки та Stories + оферні плашки.\n`;
       kp += `   Бонус: автоматичне надсилання заявок у Telegram-бота вашого менеджера через Make.\n`;
+    }
+
+    const includedOnetime = ch.addons.onetime.filter(a => a.includedIn && a.includedIn.includes(t.id));
+    const includedMonthly = ch.addons.monthly.filter(a => a.includedIn && a.includedIn.includes(t.id));
+    if (includedOnetime.length > 0 || includedMonthly.length > 0) {
+      kp += `   🎁 Включено в тариф без доплат: ${[...includedOnetime, ...includedMonthly].map(a => a.name).join(', ')}\n`;
     }
   });
 
