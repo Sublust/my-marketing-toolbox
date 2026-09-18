@@ -1,188 +1,293 @@
-import { CHANNELS, KNOWLEDGE_BASE } from './data.js';
+import { CHANNELS, PM_GUIDE } from './data.js';
 
 // Application State
 const state = {
-  channel: 'meta',
-  tier: 'pro',
+  activeChannels: ['meta', 'google'], // Default to both channels enabled for cross-channel view!
+  tiers: {
+    meta: 'pro',
+    google: 'pro'
+  },
+  addons: {
+    meta: {},
+    google: {}
+  },
   accountStatus: 'existing', // 'existing' | 'new'
   clientName: '',
-  addons: {}, // { [addonId]: number | boolean }
-  kbFilter: 'all',
-  kbSearch: ''
+  guideCategory: 'all',
+  guideSearch: ''
 };
 
-// DOM Elements
-const elChannelTabs = document.getElementById('channelTabs');
-const elTiersGrid = document.getElementById('tiersGrid');
+// DOM Selectors
 const elClientName = document.getElementById('clientName');
-const elStatusNew = document.getElementById('statusNew');
 const elStatusExisting = document.getElementById('statusExisting');
-const elOnetimeAddons = document.getElementById('onetimeAddons');
-const elMonthlyAddons = document.getElementById('monthlyAddons');
+const elStatusNew = document.getElementById('statusNew');
+const elChannelSelectors = document.getElementById('channelSelectors');
+const elModulesContainer = document.getElementById('channelModulesContainer');
 
-// Summary Figures
-const elSetupPrice = document.getElementById('setupPrice');
-const elMonthlyPrice = document.getElementById('monthlyPrice');
-const elFirstMonthTotal = document.getElementById('firstMonthTotal');
-const elBtnCopyProposal = document.getElementById('btnCopyProposal');
-const elBtnSaveClient = document.getElementById('btnSaveClient');
-const elSavedClientsSelect = document.getElementById('savedClientsSelect');
+// Sticky Summary Selectors
+const elSummaryChannelsList = document.getElementById('summaryChannelsList');
+const elTotalSetupPrice = document.getElementById('totalSetupPrice');
+const elTotalMonthlyPrice = document.getElementById('totalMonthlyPrice');
+const elTotalFirstMonth = document.getElementById('totalFirstMonth');
+const elBtnCopyWorksection = document.getElementById('btnCopyWorksection');
+const elBtnCopyClientKp = document.getElementById('btnCopyClientKp');
 
-// KB Elements
-const elKbSearch = document.getElementById('kbSearch');
-const elKbTags = document.getElementById('kbTags');
-const elKbList = document.getElementById('kbList');
+// PM Guide Selectors
+const elPmGuideSearch = document.getElementById('pmGuideSearch');
+const elPmGuideTags = document.getElementById('pmGuideTags');
+const elPmGuideList = document.getElementById('pmGuideList');
 
-// Modal Elements
+// Modal & Toast
 const elModal = document.getElementById('infoModal');
 const elModalTitle = document.getElementById('modalTitle');
 const elModalBody = document.getElementById('modalBody');
 const elModalClose = document.getElementById('modalClose');
-const elToast = document.getElementById('toastMsg');
+const elToast = document.getElementById('toastNotice');
 
-// Helpers
 function formatUah(num) {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' грн';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₴';
 }
 
 function showToast(text) {
-  elToast.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>${text}</span>`;
+  elToast.innerHTML = `<i class="fa-solid fa-check-circle" style="color:#11cfea;"></i> <span>${text}</span>`;
   elToast.classList.add('show');
   setTimeout(() => elToast.classList.remove('show'), 2500);
 }
 
-// 1. Render Tiers
-function renderTiers() {
-  const currentChannel = CHANNELS[state.channel];
-  const tiers = currentChannel.tiers;
-
-  elTiersGrid.innerHTML = Object.values(tiers).map(t => {
-    const isSelected = t.id === state.tier;
+// 1. Render Channel Check Cards
+function renderChannelCards() {
+  elChannelSelectors.innerHTML = Object.values(CHANNELS).map(ch => {
+    const isActive = state.activeChannels.includes(ch.id);
     return `
-      <div class="tier-card ${isSelected ? 'selected' : ''}" data-tier="${t.id}">
-        ${t.recommended ? '<div class="tier-badge">Основний вибір</div>' : ''}
-        <div class="tier-name">
-          <span>${t.name}</span>
-          ${isSelected ? '<i class="fa-solid fa-circle-check" style="color:var(--accent)"></i>' : ''}
+      <div class="channel-check-card ${isActive ? 'active' : ''}" data-channel="${ch.id}">
+        <div class="channel-card-top">
+          <div class="channel-icon-name">
+            <i class="${ch.icon}"></i>
+            <span>${ch.name}</span>
+          </div>
+          <div class="channel-check-indicator">
+            ${isActive ? '<i class="fa-solid fa-check"></i>' : ''}
+          </div>
         </div>
-        <div class="tier-target">${t.audience}</div>
-        <div class="tier-pricing">
-          <div class="price-main">${formatUah(t.monthlyPrice)} <span class="price-unit">/ міс.</span></div>
-          <div class="price-setup">Старт «з нуля»: ${formatUah(t.setupPrice)}</div>
+        <div class="channel-card-desc">${ch.shortDesc}</div>
+        <div class="channel-card-pricing-badge">
+          Базовий ретейнер: від ${formatUah(ch.tiers.base.monthlyPrice)}/міс.
         </div>
-        <ul class="tier-specs-preview">
-          <li><i class="fa-solid fa-layer-group"></i> ${t.limits.streams}</li>
-          <li><i class="fa-solid fa-palette"></i> ${t.limits.staticPlots} сюжетів статики (${t.limits.staticFormats})</li>
-          ${state.channel === 'meta' ? `<li><i class="fa-solid fa-video"></i> ${t.limits.readyVideos} готових відео клієнта (без монтажу)</li>` : `<li><i class="fa-brands fa-youtube"></i> Відео завантажує клієнт на YouTube</li>`}
-          <li><i class="fa-solid fa-paper-plane"></i> ${t.limits.leads}</li>
-        </ul>
       </div>
     `;
   }).join('');
 
-  // Attach click listeners to cards
-  elTiersGrid.querySelectorAll('.tier-card').forEach(card => {
+  elChannelSelectors.querySelectorAll('.channel-check-card').forEach(card => {
     card.addEventListener('click', () => {
-      state.tier = card.dataset.tier;
-      renderTiers();
-      calculateTotal();
+      const chId = card.dataset.channel;
+      if (state.activeChannels.includes(chId)) {
+        if (state.activeChannels.length > 1) {
+          state.activeChannels = state.activeChannels.filter(id => id !== chId);
+        } else {
+          showToast('У проєкті має бути обрано хоча б 1 канал реклами');
+          return;
+        }
+      } else {
+        state.activeChannels.push(chId);
+      }
+      renderChannelCards();
+      renderModules();
+      calculateTotals();
     });
   });
 }
 
-// 2. Render Add-ons
-function renderAddons() {
-  const currentChannel = CHANNELS[state.channel];
-  const onetime = currentChannel.addons.onetime;
-  const monthly = currentChannel.addons.monthly;
+// 2. Render Active Channel Modules
+function renderModules() {
+  if (state.activeChannels.length === 0) {
+    elModulesContainer.innerHTML = `
+      <div style="text-align:center; padding:40px; background:#fff; border-radius:12px; border:1px dashed #cbd5e1;">
+        <p style="color:#64748b;">Оберіть хоча б один канал у блоці вище (Meta Ads або Google Ads), щоб налаштувати пакет.</p>
+      </div>
+    `;
+    return;
+  }
 
-  // Render One-time Addons
-  elOnetimeAddons.innerHTML = onetime.map(item => {
-    const isChecked = !!state.addons[item.id];
+  elModulesContainer.innerHTML = state.activeChannels.map(chId => {
+    const channel = CHANNELS[chId];
+    const selectedTierId = state.tiers[chId] || 'pro';
+    const currentTier = channel.tiers[selectedTierId];
+
     return `
-      <div class="addon-row">
-        <div class="addon-info-left">
-          <input type="checkbox" class="addon-checkbox" id="${item.id}" data-id="${item.id}" ${isChecked ? 'checked' : ''} />
-          <label for="${item.id}" class="addon-name">${item.name}</label>
-          <button class="btn-info-pop" data-info="${item.info}" data-title="${item.name}" title="Детальніше">
-            <i class="fa-solid fa-circle-info"></i>
-          </button>
+      <div class="channel-module" id="module_${chId}">
+        <div class="module-header">
+          <div class="module-title-area">
+            <i class="${channel.icon}" style="font-size:24px; color:var(--accent-blue);"></i>
+            <div>
+              <h3>${channel.name} — Пакети та операційні межі</h3>
+              <p style="font-size:12px; color:var(--text-muted);">${channel.pmHighlights}</p>
+            </div>
+          </div>
         </div>
-        <div class="addon-controls-right">
-          <div class="addon-price-tag">+${formatUah(item.price)}</div>
+
+        <!-- Tiers Grid for this channel -->
+        <div class="tiers-row">
+          ${Object.values(channel.tiers).map(t => {
+            const isSelected = t.id === selectedTierId;
+            return `
+              <div class="tier-item ${isSelected ? 'selected' : ''}" data-channel="${chId}" data-tier="${t.id}">
+                ${t.recommended ? '<div class="tier-flag">Основний вибір</div>' : ''}
+                <div class="tier-item-head">
+                  <div class="tier-title">${t.name}</div>
+                  ${isSelected ? '<i class="fa-solid fa-circle-check" style="color:var(--accent-blue); font-size:16px;"></i>' : ''}
+                </div>
+                <div class="tier-for">${t.audience}</div>
+                <div class="tier-price-block">
+                  <div class="tier-price-val">${formatUah(t.monthlyPrice)} <span style="font-size:12px; font-weight:normal; color:#64748b;">/ міс.</span></div>
+                  <div class="tier-price-sub">Стартовий сетап: ${formatUah(t.setupPrice)}</div>
+                </div>
+                <ul class="tier-specs-list">
+                  <li><i class="fa-solid fa-layer-group"></i> <span><strong>${t.limits.streams}</strong></span></li>
+                  <li><i class="fa-solid fa-palette"></i> <span><strong>${t.limits.staticPlots} сюжетів</strong> (${t.limits.staticFormats})</span></li>
+                  ${chId === 'meta' 
+                    ? `<li><i class="fa-solid fa-video"></i> <span><strong>${t.limits.readyVideos} відео клієнта</strong> (Safe Zones 4:5/9:16/1:1, плашки. Без монтажу)</span></li>`
+                    : `<li><i class="fa-brands fa-youtube"></i> <span>Відео вантажить замовник на свій YouTube</span></li>`
+                  }
+                  <li><i class="fa-solid fa-paper-plane"></i> <span>${t.limits.leads}</span></li>
+                  <li><i class="fa-solid fa-file-lines"></i> <span>${t.limits.reporting}</span></li>
+                </ul>
+              </div>
+            `;
+          }).join('')}
         </div>
+
+        <!-- PM Advice Callout for the Selected Tier -->
+        <div class="pm-cheat-box">
+          <div class="pm-cheat-title">
+            <i class="fa-solid fa-lightbulb"></i>
+            <span>Шпаргалка для PM по тарифу ${currentTier.name} (${channel.name})</span>
+          </div>
+          <div class="pm-cheat-content">
+            <p><strong>🎯 Коли пропонувати:</strong> ${currentTier.pmAdvice.whenToSell}</p>
+            <p style="margin-top:4px;"><strong>⚡ Тригер для апгрейду:</strong> ${currentTier.pmAdvice.upgradeTrigger}</p>
+          </div>
+        </div>
+
+        <!-- Add-ons Sub-block for this Channel -->
+        <div class="module-addons-area">
+          <div style="font-size:13px; font-weight:800; text-transform:uppercase; color:var(--text-main); margin-bottom:12px; display:flex; justify-content:space-between;">
+            <span>Додаткові опції (Add-ons) для ${channel.name}</span>
+            <span style="font-size:11px; font-weight:normal; color:var(--text-muted);">Разові та щомісячні надбудови</span>
+          </div>
+
+          <!-- Monthly Add-ons -->
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">
+            Щомісячні опції (впливають на щомісячний чек):
+          </div>
+          ${channel.addons.monthly.map(a => {
+            if (a.type === 'counter') {
+              const val = (state.addons[chId] && state.addons[chId][a.id]) || 0;
+              return `
+                <div class="addon-row-light">
+                  <div class="addon-left">
+                    <span class="addon-title">${a.name}</span>
+                    <button class="btn-pm-info" data-title="${a.name}" data-info="${a.info}" title="Довідка">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                  </div>
+                  <div class="addon-right">
+                    <span class="addon-price">+${formatUah(a.price)} / ${a.unit}</span>
+                    <div class="counter-widget">
+                      <button class="counter-btn-light" data-action="dec" data-channel="${chId}" data-id="${a.id}">-</button>
+                      <span class="counter-num">${val}</span>
+                      <button class="counter-btn-light" data-action="inc" data-channel="${chId}" data-id="${a.id}">+</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            } else {
+              const isChecked = state.addons[chId] && state.addons[chId][a.id];
+              return `
+                <div class="addon-row-light">
+                  <div class="addon-left">
+                    <input type="checkbox" id="${chId}_${a.id}" data-channel="${chId}" data-id="${a.id}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;" />
+                    <label for="${chId}_${a.id}" class="addon-title" style="cursor:pointer;">${a.name}</label>
+                    <button class="btn-pm-info" data-title="${a.name}" data-info="${a.info}" title="Довідка">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                  </div>
+                  <div class="addon-right">
+                    <span class="addon-price">+${formatUah(a.price)} / міс.</span>
+                  </div>
+                </div>
+              `;
+            }
+          }).join('')}
+
+          <!-- One-time Add-ons -->
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin:14px 0 8px 0;">
+            Разові технічні рішення (One-time Setup):
+          </div>
+          ${channel.addons.onetime.map(a => {
+            const isChecked = state.addons[chId] && state.addons[chId][a.id];
+            return `
+              <div class="addon-row-light">
+                <div class="addon-left">
+                  <input type="checkbox" id="${chId}_${a.id}" data-channel="${chId}" data-id="${a.id}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;" />
+                  <label for="${chId}_${a.id}" class="addon-title" style="cursor:pointer;">${a.name}</label>
+                  <button class="btn-pm-info" data-title="${a.name}" data-info="${a.info}" title="Довідка">
+                    <i class="fa-solid fa-circle-info"></i>
+                  </button>
+                </div>
+                <div class="addon-right">
+                  <span class="addon-price">+${formatUah(a.price)}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
       </div>
     `;
   }).join('');
 
-  // Render Monthly Addons
-  elMonthlyAddons.innerHTML = monthly.map(item => {
-    if (item.type === 'counter') {
-      const count = state.addons[item.id] || 0;
-      return `
-        <div class="addon-row">
-          <div class="addon-info-left">
-            <span class="addon-name">${item.name}</span>
-            <button class="btn-info-pop" data-info="${item.info}" data-title="${item.name}" title="Детальніше">
-              <i class="fa-solid fa-circle-info"></i>
-            </button>
-          </div>
-          <div class="addon-controls-right">
-            <div class="addon-price-tag">+${formatUah(item.price)} / ${item.unit}</div>
-            <div class="counter-box">
-              <button class="counter-btn" data-action="dec" data-id="${item.id}">-</button>
-              <span class="counter-val">${count}</span>
-              <button class="counter-btn" data-action="inc" data-id="${item.id}">+</button>
-            </div>
-          </div>
-        </div>
-      `;
-    } else {
-      const isChecked = !!state.addons[item.id];
-      return `
-        <div class="addon-row">
-          <div class="addon-info-left">
-            <input type="checkbox" class="addon-checkbox" id="${item.id}" data-id="${item.id}" ${isChecked ? 'checked' : ''} />
-            <label for="${item.id}" class="addon-name">${item.name}</label>
-            <button class="btn-info-pop" data-info="${item.info}" data-title="${item.name}" title="Детальніше">
-              <i class="fa-solid fa-circle-info"></i>
-            </button>
-          </div>
-          <div class="addon-controls-right">
-            <div class="addon-price-tag">+${formatUah(item.price)} / міс.</div>
-          </div>
-        </div>
-      `;
-    }
-  }).join('');
-
-  // Attach Addon Listeners
-  const allInputs = document.querySelectorAll('.addons-section input[type="checkbox"]');
-  allInputs.forEach(input => {
-    input.addEventListener('change', (e) => {
-      state.addons[e.target.dataset.id] = e.target.checked;
-      calculateTotal();
+  // Attach tier click handlers
+  document.querySelectorAll('.tier-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const ch = item.dataset.channel;
+      const t = item.dataset.tier;
+      state.tiers[ch] = t;
+      renderModules();
+      calculateTotals();
     });
   });
 
-  const counterBtns = document.querySelectorAll('.counter-btn');
-  counterBtns.forEach(btn => {
+  // Attach addon checkbox listeners
+  document.querySelectorAll('.module-addons-area input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const ch = e.target.dataset.channel;
+      const id = e.target.dataset.id;
+      if (!state.addons[ch]) state.addons[ch] = {};
+      state.addons[ch][id] = e.target.checked;
+      calculateTotals();
+    });
+  });
+
+  // Attach counter buttons
+  document.querySelectorAll('.counter-btn-light').forEach(btn => {
     btn.addEventListener('click', () => {
+      const ch = btn.dataset.channel;
       const id = btn.dataset.id;
       const action = btn.dataset.action;
-      const current = state.addons[id] || 0;
+      if (!state.addons[ch]) state.addons[ch] = {};
+      const current = state.addons[ch][id] || 0;
       if (action === 'inc') {
-        state.addons[id] = current + 1;
+        state.addons[ch][id] = current + 1;
       } else if (action === 'dec' && current > 0) {
-        state.addons[id] = current - 1;
+        state.addons[ch][id] = current - 1;
       }
-      renderAddons();
-      calculateTotal();
+      renderModules();
+      calculateTotals();
     });
   });
 
   // Attach info buttons
-  document.querySelectorAll('.btn-info-pop').forEach(btn => {
+  document.querySelectorAll('.btn-pm-info').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       openModal(btn.dataset.title, btn.dataset.info);
@@ -190,112 +295,214 @@ function renderAddons() {
   });
 }
 
-// 3. Calculation Logic
-function calculateTotal() {
-  const currentChannel = CHANNELS[state.channel];
-  const currentTier = currentChannel.tiers[state.tier];
+// 3. Totals Calculation
+function calculateTotals() {
+  let totalSetup = 0;
+  let totalMonthly = 0;
+  const channelSummaries = [];
 
-  // Base setup fee
-  let setupFee = state.accountStatus === 'new' ? currentTier.setupPrice : 0;
+  state.activeChannels.forEach(chId => {
+    const channel = CHANNELS[chId];
+    const tierId = state.tiers[chId] || 'pro';
+    const tier = channel.tiers[tierId];
 
-  // Add-ons: One-time
-  currentChannel.addons.onetime.forEach(item => {
-    if (state.addons[item.id]) {
-      setupFee += item.price;
+    channelSummaries.push(`${channel.name} (${tier.name})`);
+
+    // Setup Fee
+    if (state.accountStatus === 'new') {
+      totalSetup += tier.setupPrice;
     }
-  });
 
-  // Monthly Retainer
-  let monthlyFee = currentTier.monthlyPrice;
+    // Onetime Addons
+    channel.addons.onetime.forEach(a => {
+      if (state.addons[chId] && state.addons[chId][a.id]) {
+        totalSetup += a.price;
+      }
+    });
 
-  // Add-ons: Monthly
-  currentChannel.addons.monthly.forEach(item => {
-    if (item.type === 'counter') {
-      const count = state.addons[item.id] || 0;
-      monthlyFee += count * item.price;
-    } else if (state.addons[item.id]) {
-      monthlyFee += item.price;
-    }
-  });
+    // Monthly Retainer
+    totalMonthly += tier.monthlyPrice;
 
-  const firstMonthTotal = setupFee + monthlyFee;
-
-  // Update UI figures
-  elSetupPrice.textContent = formatUah(setupFee);
-  elMonthlyPrice.textContent = formatUah(monthlyFee);
-  elFirstMonthTotal.textContent = formatUah(firstMonthTotal);
-
-  return { setupFee, monthlyFee, firstMonthTotal, currentTier };
-}
-
-// 4. Knowledge Base Rendering & Search
-function renderKnowledgeBase() {
-  const categories = [
-    { id: 'all', name: 'Усі теми' },
-    { id: 'pricing', name: 'Ціноутворення' },
-    { id: 'creatives', name: 'Креативи 4:5/9:16' },
-    { id: 'video', name: 'Відео (без монтажу)' },
-    { id: 'leads', name: 'Telegram & CRM' },
-    { id: 'structure', name: 'Кампанії та ліміти' },
-    { id: 'reporting', name: 'Звітність' }
-  ];
-
-  elKbTags.innerHTML = categories.map(c => `
-    <button class="kb-tag ${state.kbFilter === c.id ? 'active' : ''}" data-cat="${c.id}">
-      ${c.name}
-    </button>
-  `).join('');
-
-  elKbTags.querySelectorAll('.kb-tag').forEach(tag => {
-    tag.addEventListener('click', () => {
-      state.kbFilter = tag.dataset.cat;
-      renderKnowledgeBase();
+    // Monthly Addons
+    channel.addons.monthly.forEach(a => {
+      if (a.type === 'counter') {
+        const count = (state.addons[chId] && state.addons[chId][a.id]) || 0;
+        totalMonthly += count * a.price;
+      } else if (state.addons[chId] && state.addons[chId][a.id]) {
+        totalMonthly += a.price;
+      }
     });
   });
 
-  // Filter KB items
-  const query = state.kbSearch.toLowerCase().trim();
-  const filtered = KNOWLEDGE_BASE.filter(item => {
-    const matchesCat = state.kbFilter === 'all' || item.category === state.kbFilter;
-    const matchesSearch = !query ||
-      item.title.toLowerCase().includes(query) ||
-      item.short.toLowerCase().includes(query) ||
-      item.content.toLowerCase().includes(query);
-    return matchesCat && matchesSearch;
+  const grandTotalFirstMonth = totalSetup + totalMonthly;
+
+  // Update Summary UI
+  elSummaryChannelsList.textContent = channelSummaries.join(' + ') || 'Жодного каналу не обрано';
+  elTotalSetupPrice.textContent = formatUah(totalSetup);
+  elTotalMonthlyPrice.textContent = formatUah(totalMonthly);
+  elTotalFirstMonth.textContent = formatUah(grandTotalFirstMonth);
+
+  return { totalSetup, totalMonthly, grandTotalFirstMonth };
+}
+
+// 4. PM Guide & Scripts Accordion
+function renderPmGuide() {
+  const categories = [
+    { id: 'all', name: 'Усі теми' },
+    { id: 'Робота з відео', name: 'Відео (без монтажу)' },
+    { id: 'Креативи та дизайн', name: 'Креативи 4:5/9:16' },
+    { id: 'Ліди та інтеграції', name: 'Telegram & CRM' },
+    { id: 'Кампанії та ліміти', name: 'Ліміти та кампанії' },
+    { id: 'Ціноутворення', name: 'Сетап та ціни' }
+  ];
+
+  elPmGuideTags.innerHTML = categories.map(cat => `
+    <button class="nav-hub-link ${state.guideCategory === cat.id ? 'active' : ''}" data-cat="${cat.id}" style="${state.guideCategory === cat.id ? 'background:#081942; color:#fff; border-color:#081942;' : ''}">
+      ${cat.name}
+    </button>
+  `).join('');
+
+  elPmGuideTags.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.guideCategory = btn.dataset.cat;
+      renderPmGuide();
+    });
+  });
+
+  const q = state.guideSearch.toLowerCase().trim();
+  const filtered = PM_GUIDE.filter(item => {
+    const matchCat = state.guideCategory === 'all' || item.tag === state.guideCategory;
+    const matchSearch = !q || item.q.toLowerCase().includes(q) || item.short.toLowerCase().includes(q) || item.clientScript.toLowerCase().includes(q);
+    return matchCat && matchSearch;
   });
 
   if (filtered.length === 0) {
-    elKbList.innerHTML = `<div style="text-align:center; padding:32px 16px; color:var(--muted); font-size:13px;">Нічого не знайдено за запитом "${query}"</div>`;
+    elPmGuideList.innerHTML = `<div style="text-align:center; padding:24px; color:#64748b; font-size:13px;">Нічого не знайдено за запитом "${q}"</div>`;
     return;
   }
 
-  elKbList.innerHTML = filtered.map(item => `
-    <div class="kb-item-card" id="${item.id}">
-      <div class="kb-item-header">
-        <div class="kb-item-title-wrap">
-          <span class="kb-item-category">${item.categoryName}</span>
-          <div class="kb-item-title">${item.title}</div>
-          <div class="kb-item-short">${item.short}</div>
+  elPmGuideList.innerHTML = filtered.map(item => `
+    <div class="kb-card" id="${item.id}">
+      <div class="kb-card-header">
+        <div>
+          <div class="kb-card-tag">${item.tag}</div>
+          <div class="kb-card-q">${item.q}</div>
+          <div class="kb-card-short">${item.short}</div>
         </div>
-        <i class="fa-solid fa-chevron-down kb-chevron"></i>
+        <i class="fa-solid fa-chevron-down kb-chevron" style="color:#64748b; transition:transform 0.2s;"></i>
       </div>
-      <div class="kb-item-body">
-        ${item.content}
+      <div class="kb-card-body">
+        <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#081942; margin-bottom:4px;">
+          💬 Як розказати про це клієнту (готовий скрипт для PM):
+        </div>
+        <div class="script-bubble">
+          ${item.clientScript}
+        </div>
+        <div style="margin-top:10px; font-size:12px; color:#475569;">
+          <strong>Внутрішній коментар агенції:</strong> ${item.details}
+        </div>
       </div>
     </div>
   `).join('');
 
-  elKbList.querySelectorAll('.kb-item-header').forEach(header => {
-    header.addEventListener('click', () => {
-      header.parentElement.classList.toggle('open');
+  elPmGuideList.querySelectorAll('.kb-card-header').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      hdr.parentElement.classList.toggle('open');
     });
   });
 }
 
-// 5. Modal Handlers
-function openModal(title, bodyHtml) {
+// 5. Worksection Task Spec Generator
+function generateWorksectionSpec() {
+  const { totalSetup, totalMonthly, grandTotalFirstMonth } = calculateTotals();
+  const client = state.clientName.trim() || 'Новий клієнт';
+
+  let spec = `📌 ПАСПОРТ ПРОЄКТУ / ОПИС ПАКЕТА ДЛЯ WORKSECTION\n`;
+  spec += `👤 Клієнт: ${client}\n`;
+  spec += `📅 Дата формування: ${new Date().toLocaleDateString('uk-UA')}\n`;
+  spec += `⚙️ Статус запуску: ${state.accountStatus === 'new' ? 'Запуск «з нуля»' : 'Діючий кабінет (сетап 0 грн)'}\n\n`;
+
+  spec += `🎯 ПІДКЛЮЧЕНІ КАНАЛИ ТА ТАРИФИ:\n`;
+  state.activeChannels.forEach(chId => {
+    const ch = CHANNELS[chId];
+    const t = ch.tiers[state.tiers[chId] || 'pro'];
+    spec += `\n▶ [${ch.name.toUpperCase()}] Тариф: ${t.name} (${formatUah(t.monthlyPrice)}/міс.)\n`;
+    spec += `  • Напрямки бізнесу: ${t.limits.streams}\n`;
+    spec += `  • Статичні банери: до ${t.limits.staticPlots} сюжетів (формати: ${t.limits.staticFormats} — до ${t.limits.staticFilesTotal} файлів)\n`;
+    if (chId === 'meta') {
+      spec += `  • Відео клієнта: до ${t.limits.readyVideos} змонтованих роликів (Safe Zones 4:5/9:16/1:1 + плашки. БЕЗ МОНТАЖУ)\n`;
+      spec += `  • Лідогенерація: миттєве сповіщення в Telegram через Make\n`;
+    } else {
+      spec += `  • Відео: завантажує замовник на свій YouTube\n`;
+    }
+    spec += `  • Звітність: ${t.limits.reporting}\n`;
+
+    // Add-ons for this channel
+    const onetimeSelected = ch.addons.onetime.filter(a => state.addons[chId] && state.addons[chId][a.id]);
+    const monthlySelected = ch.addons.monthly.filter(a => (a.type === 'counter' ? state.addons[chId] && state.addons[chId][a.id] > 0 : state.addons[chId] && state.addons[chId][a.id]));
+
+    if (onetimeSelected.length > 0 || monthlySelected.length > 0) {
+      spec += `  • Активні Add-ons:\n`;
+      onetimeSelected.forEach(a => spec += `    + [Разово] ${a.name} (+${formatUah(a.price)})\n`);
+      monthlySelected.forEach(a => {
+        if (a.type === 'counter') {
+          const cnt = state.addons[chId][a.id];
+          spec += `    + [Щомісяця] ${a.name} (x${cnt}) (+${formatUah(a.price * cnt)}/міс.)\n`;
+        } else {
+          spec += `    + [Щомісяця] ${a.name} (+${formatUah(a.price)}/міс.)\n`;
+        }
+      });
+    }
+  });
+
+  spec += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  spec += `💰 ЗВЕДЕНІ ФІНАНСОВІ УМОВИ:\n`;
+  spec += `• Стартовий платіж (Setup): ${formatUah(totalSetup)}\n`;
+  spec += `• Щомісячний ретейнер (Monthly): ${formatUah(totalMonthly)} / місяць\n`;
+  spec += `• Всього за перший місяць: ${formatUah(grandTotalFirstMonth)}\n`;
+
+  return spec;
+}
+
+// 6. Client Proposal Generator
+function generateClientKp() {
+  const { totalSetup, totalMonthly, grandTotalFirstMonth } = calculateTotals();
+  const client = state.clientName.trim() || 'Клієнт';
+
+  let kp = `💼 КОМЕРЦІЙНА ПРОПОЗИЦІЯ IMREV AGENCY\n`;
+  kp += `Для проєкту: ${client}\n\n`;
+
+  kp += `Обрані напрямки просування:\n`;
+  state.activeChannels.forEach(chId => {
+    const ch = CHANNELS[chId];
+    const t = ch.tiers[state.tiers[chId] || 'pro'];
+    kp += `✅ ${ch.name} — Пакет ${t.name}\n`;
+    kp += `   Обсяг: ${t.limits.streams}; дизайн-стандарт: до ${t.limits.staticPlots} сюжетів у 3 форматах (1:1, 4:5, 9:16 — разом до ${t.limits.staticFilesTotal} файлів щомісяця).\n`;
+    if (chId === 'meta') {
+      kp += `   Відео: технічна адаптація до ${t.limits.readyVideos} ваших змонтованих роликів під формати стрічки та Stories + оферні плашки.\n`;
+      kp += `   Бонус: автоматичне надсилання заявок у Telegram-бота вашого менеджера через Make.\n`;
+    }
+  });
+
+  kp += `\nВартість послуг агенції:\n`;
+  if (state.accountStatus === 'new') {
+    kp += `• Разове налаштування та запуск: ${formatUah(totalSetup)}\n`;
+  } else {
+    kp += `• Стартове налаштування: 0 грн (діючий робочий акаунт)\n`;
+    if (totalSetup > 0) kp += `• Разові обрані рішення: ${formatUah(totalSetup)}\n`;
+  }
+  kp += `• Щомісячний регулярний супровід: ${formatUah(totalMonthly)} / місяць\n`;
+  kp += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  kp += `🔥 Разом за перший місяць: ${formatUah(grandTotalFirstMonth)}\n`;
+  kp += `(Рекламний бюджет сплачується напряму в кабінети Meta / Google)\n`;
+
+  return kp;
+}
+
+// 7. Modal Handlers
+function openModal(title, body) {
   elModalTitle.textContent = title;
-  elModalBody.innerHTML = bodyHtml;
+  elModalBody.innerHTML = body;
   elModal.classList.add('open');
 }
 
@@ -304,196 +511,50 @@ elModal.addEventListener('click', (e) => {
   if (e.target === elModal) elModal.classList.remove('open');
 });
 
-// 6. Proposal Text Generator (Telegram / Email / Worksection)
-function generateProposalText() {
-  const { setupFee, monthlyFee, firstMonthTotal, currentTier } = calculateTotal();
-  const currentChannel = CHANNELS[state.channel];
-  const client = state.clientName.trim() || 'Клієнт';
-
-  let text = `💼 КОМЕРЦІЙНА ПРОПОЗИЦІЯ IMREV AGENCY\n`;
-  text += `👤 Проєкт: ${client}\n`;
-  text += `🚀 Напрямок: ${currentChannel.name} (${currentChannel.subtitle})\n`;
-  text += `📦 Тарифний пакет: ${currentTier.name}\n\n`;
-
-  text += `📋 ЩО ВХОДИТЬ У ЩОМІСЯЧНИЙ СУПРОВІД:\n`;
-  text += `• Просувані напрямки: ${currentTier.limits.streams}\n`;
-  text += `• Статичні креативи: до ${currentTier.limits.staticPlots} сюжетів на місяць (адаптація у 3 формати: 1:1, 4:5, 9:16 — разом до ${currentTier.limits.staticPlots * 3} файлів)\n`;
-  if (state.channel === 'meta') {
-    text += `• Відеоклієнта: адаптація до ${currentTier.limits.readyVideos} готових змонтованих роликів (кадрування Safe Zones під 9:16/4:5/1:1, брендовані плашки з офером, тримінг. Без монтажу)\n`;
-    text += `• Лідогенерація: миттєве сповіщення менеджера в Telegram-бота через Make (до 2–4 форм включено)\n`;
-  } else {
-    text += `• Відеокампанії: завантаження клієнтом на YouTube (супровід у Demand Gen / PMax)\n`;
-    text += `• Аналітика та цілі: відстеження конверсій у GA4 + GTM\n`;
-  }
-  text += `• Звітність: щомісячний детальний структурований звіт у тасці Worksection\n`;
-  text += `• Комунікація: щомісячна презентація звіту / зустріч + робочий чат\n\n`;
-
-  // Selected Add-ons
-  const selectedOnetime = currentChannel.addons.onetime.filter(a => state.addons[a.id]);
-  const selectedMonthly = currentChannel.addons.monthly.filter(a => (a.type === 'counter' ? state.addons[a.id] > 0 : state.addons[a.id]));
-
-  if (selectedOnetime.length > 0 || selectedMonthly.length > 0) {
-    text += `➕ ОБРАНІ ДОДАТКОВІ ОПЦІЇ (ADD-ONS):\n`;
-    selectedOnetime.forEach(a => {
-      text += `• [Разово] ${a.name}: +${formatUah(a.price)}\n`;
-    });
-    selectedMonthly.forEach(a => {
-      if (a.type === 'counter') {
-        const cnt = state.addons[a.id];
-        text += `• [Щомісяця] ${a.name} (x${cnt}): +${formatUah(a.price * cnt)}/міс.\n`;
-      } else {
-        text += `• [Щомісяця] ${a.name}: +${formatUah(a.price)}/міс.\n`;
-      }
-    });
-    text += `\n`;
-  }
-
-  text += `💰 ФІНАНСОВІ УМОВИ:\n`;
-  if (state.accountStatus === 'new') {
-    text += `• Стартовий запуск «з нуля»: ${formatUah(setupFee)}\n`;
-  } else {
-    text += `• Стартовий запуск: 0 грн (діючий налаштований акаунт)\n`;
-    if (setupFee > 0) {
-      text += `• Разові додаткові послуги: ${formatUah(setupFee)}\n`;
-    }
-  }
-  text += `• Щомісячний регулярний супровід: ${formatUah(monthlyFee)} / місяць\n`;
-  text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🔥 РАЗОМ ЗА ПЕРШИЙ МІСЯЦЬ: ${formatUah(firstMonthTotal)}\n`;
-  text += `(Рекламний бюджет оплачується клієнтом напряму в рекламний кабінет)\n`;
-
-  return text;
-}
-
-// 7. Client Database (LocalStorage)
-function getSavedClients() {
-  try {
-    return JSON.parse(localStorage.getItem('imrev_saved_tariffs') || '[]');
-  } catch (e) {
-    return [];
-  }
-}
-
-function updateSavedClientsDropdown() {
-  const clients = getSavedClients();
-  if (clients.length === 0) {
-    elSavedClientsSelect.innerHTML = '<option value="">(Немає збережених клієнтів)</option>';
-    return;
-  }
-  elSavedClientsSelect.innerHTML = '<option value="">📁 Обрати зі збережених клієнтів...</option>' +
-    clients.map((c, i) => `<option value="${i}">${c.clientName || 'Без назви'} — ${c.channel.toUpperCase()} (${c.tier}) [${formatUah(c.monthlyFee)}/міс.]</option>`).join('');
-}
-
-function saveCurrentClient() {
-  const { setupFee, monthlyFee, firstMonthTotal } = calculateTotal();
-  const name = state.clientName.trim() || 'Клієнт ' + new Date().toLocaleDateString('uk-UA');
-  
-  const clientData = {
-    id: 'c_' + Date.now(),
-    clientName: name,
-    channel: state.channel,
-    tier: state.tier,
-    accountStatus: state.accountStatus,
-    addons: { ...state.addons },
-    setupFee,
-    monthlyFee,
-    firstMonthTotal,
-    updatedAt: new Date().toISOString()
-  };
-
-  const clients = getSavedClients();
-  const existingIndex = clients.findIndex(c => c.clientName.toLowerCase() === name.toLowerCase());
-  if (existingIndex >= 0) {
-    clients[existingIndex] = clientData;
-  } else {
-    clients.unshift(clientData);
-  }
-
-  localStorage.setItem('imrev_saved_tariffs', JSON.stringify(clients));
-  updateSavedClientsDropdown();
-  showToast(`Проєкт "${name}" збережено в базу!`);
-}
-
-elSavedClientsSelect.addEventListener('change', (e) => {
-  const index = e.target.value;
-  if (index === '') return;
-  const clients = getSavedClients();
-  const client = clients[index];
-  if (!client) return;
-
-  state.channel = client.channel;
-  state.tier = client.tier;
-  state.accountStatus = client.accountStatus;
-  state.clientName = client.clientName;
-  state.addons = client.addons || {};
-
-  // Update tabs UI
-  elChannelTabs.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.channel === state.channel);
-  });
-
-  // Update status UI
-  elStatusNew.classList.toggle('active', state.accountStatus === 'new');
-  elStatusExisting.classList.toggle('active', state.accountStatus === 'existing');
-
-  elClientName.value = state.clientName;
-
-  renderTiers();
-  renderAddons();
-  calculateTotal();
-  showToast(`Завантажено проєкт "${client.clientName}"`);
-});
-
-// 8. Event Listeners Init
-elChannelTabs.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    state.channel = btn.dataset.channel;
-    elChannelTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    state.addons = {}; // reset addons on channel change
-    renderTiers();
-    renderAddons();
-    calculateTotal();
-  });
+// 8. Event Listeners
+elStatusExisting.addEventListener('click', () => {
+  state.accountStatus = 'existing';
+  elStatusExisting.classList.add('active');
+  elStatusNew.classList.remove('active');
+  calculateTotals();
 });
 
 elStatusNew.addEventListener('click', () => {
   state.accountStatus = 'new';
   elStatusNew.classList.add('active');
   elStatusExisting.classList.remove('active');
-  calculateTotal();
-});
-
-elStatusExisting.addEventListener('click', () => {
-  state.accountStatus = 'existing';
-  elStatusExisting.classList.add('active');
-  elStatusNew.classList.remove('active');
-  calculateTotal();
+  calculateTotals();
 });
 
 elClientName.addEventListener('input', (e) => {
   state.clientName = e.target.value;
 });
 
-elKbSearch.addEventListener('input', (e) => {
-  state.kbSearch = e.target.value;
-  renderKnowledgeBase();
+elPmGuideSearch.addEventListener('input', (e) => {
+  state.guideSearch = e.target.value;
+  renderPmGuide();
 });
 
-elBtnCopyProposal.addEventListener('click', () => {
-  const proposalText = generateProposalText();
-  navigator.clipboard.writeText(proposalText).then(() => {
-    showToast('КП скопійовано в буфер обміну!');
+elBtnCopyWorksection.addEventListener('click', () => {
+  const spec = generateWorksectionSpec();
+  navigator.clipboard.writeText(spec).then(() => {
+    showToast('Паспорт для Worksection скопійовано!');
   }).catch(() => {
-    prompt('Скопіюйте комерційну пропозицію вручну:', proposalText);
+    prompt('Скопіюйте опис для Worksection:', spec);
   });
 });
 
-elBtnSaveClient.addEventListener('click', saveCurrentClient);
+elBtnCopyClientKp.addEventListener('click', () => {
+  const kp = generateClientKp();
+  navigator.clipboard.writeText(kp).then(() => {
+    showToast('КП для клієнта скопійовано!');
+  }).catch(() => {
+    prompt('Скопіюйте комерційну пропозицію:', kp);
+  });
+});
 
-// Initialize App
-renderTiers();
-renderAddons();
-calculateTotal();
-renderKnowledgeBase();
-updateSavedClientsDropdown();
+// Initial Render
+renderChannelCards();
+renderModules();
+calculateTotals();
+renderPmGuide();

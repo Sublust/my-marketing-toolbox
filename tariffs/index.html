@@ -3,228 +3,228 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Imrev Tariffs & Knowledge Base | Калькулятор тарифів</title>
+  <title>Тарифи та база нормативів агенції | IMREV AGENCY</title>
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 </head>
 <body>
 
-  <div class="app-container">
+  <div class="app-wrapper">
 
-    <!-- Top Header -->
-    <header class="top-header">
-      <div class="brand">
-        <div class="brand-icon">
-          <i class="fa-solid fa-calculator"></i>
+    <!-- Top Header in imrev.agency style -->
+    <header class="site-header">
+      <div class="brand-area">
+        <div class="brand-badge">
+          <i class="fa-solid fa-cube"></i>
         </div>
         <div>
-          <h1 class="brand-title">Imrev Tariffs & Knowledge Base</h1>
-          <div class="brand-subtitle">Інтерактивний калькулятор вартості, підбір Add-ons та база нормативів агенції</div>
+          <h1 class="brand-name">IMREV AGENCY</h1>
+          <div class="brand-tagline">Калькулятор тарифів & Операційна база нормативів для PM та лідогенерації</div>
         </div>
       </div>
 
-      <div class="header-actions">
-        <a href="/" class="btn-nav-hub">
+      <div>
+        <a href="/" class="nav-hub-link">
           <i class="fa-solid fa-arrow-left"></i>
-          <span>До всіх інструментів</span>
+          <span>До всіх інструментів хабу</span>
         </a>
       </div>
     </header>
 
-    <!-- Main Grid -->
-    <main class="main-layout">
+    <!-- Main Content Area -->
+    <main>
 
-      <!-- LEFT: Calculator & Proposal Builder -->
-      <section class="calculator-column">
-        
-        <div class="card-box">
-          <div class="card-title">
-            <span><i class="fa-solid fa-sliders"></i> 1. Вибір каналу та проєкту</span>
-          </div>
-
-          <!-- Channel Tabs -->
-          <div class="channel-tabs" id="channelTabs">
-            <button class="tab-btn active" data-channel="meta">
-              <i class="fa-brands fa-meta"></i>
-              <span>Meta Ads (Instagram / FB)</span>
-            </button>
-            <button class="tab-btn" data-channel="google">
-              <i class="fa-brands fa-google"></i>
-              <span>Google Ads (Search / PMax)</span>
-            </button>
-          </div>
-
-          <!-- Client & Status Config Bar -->
-          <div class="config-bar">
-            <div class="input-group">
-              <label class="input-label" for="clientName">Проєкт / Клієнт</label>
-              <input type="text" id="clientName" class="text-input" placeholder="Наприклад: Мережка, Тотоша..." />
+      <!-- 1. Channels Selection & Project Configuration -->
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <div class="section-title">
+              <i class="fa-solid fa-layer-group"></i> 1. Вибір каналів просування проєкту
             </div>
-
-            <div class="input-group">
-              <label class="input-label">Статус акаунта</label>
-              <div class="status-toggle">
-                <button type="button" class="status-btn active" id="statusExisting" title="Сетап не стягується, якщо кампанії вже працюють коректно">
-                  Діючий (сетап 0 ₴)
-                </button>
-                <button type="button" class="status-btn" id="statusNew" title="Включає первинний сетап кампаній, збір семантики/пікселів">
-                  З нуля (із сетапом)
-                </button>
-              </div>
+            <div class="section-desc">
+              Оберіть один або кілька каналів (Meta Ads, Google Ads). Проєкт може вестись комплексно по обох напрямках одночасно.
             </div>
           </div>
-
-          <!-- Saved Clients Dropdown (Structural Client DB) -->
-          <div class="input-group" style="margin-bottom: 20px;">
-            <label class="input-label" for="savedClientsSelect">База збережених розрахунків</label>
-            <select id="savedClientsSelect" class="text-input">
-              <option value="">(Немає збережених клієнтів)</option>
-            </select>
-          </div>
-
-          <div class="card-title" style="margin-top: 24px;">
-            <span><i class="fa-solid fa-layer-group"></i> 2. Вибір тарифного пакета</span>
-          </div>
-
-          <!-- Tiers Cards -->
-          <div class="tiers-grid" id="tiersGrid">
-            <!-- Rendered by app.js -->
-          </div>
-
-          <!-- Add-ons Section -->
-          <div class="addons-section">
-            <div class="card-title">
-              <span><i class="fa-solid fa-puzzle-piece"></i> 3. Конфігуратор додаткових опцій (Add-ons)</span>
-            </div>
-
-            <div class="addon-group-title">
-              <span>Регулярні щомісячні надбудови (Monthly)</span>
-              <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Впливають на щомісячний чек</span>
-            </div>
-            <div class="addons-list" id="monthlyAddons">
-              <!-- Rendered by app.js -->
-            </div>
-
-            <div class="addon-group-title">
-              <span>Разові технічні опції (One-time Setup)</span>
-              <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Оплачуються 1 раз на старті</span>
-            </div>
-            <div class="addons-list" id="onetimeAddons">
-              <!-- Rendered by app.js -->
-            </div>
-          </div>
-
-          <!-- Summary Box -->
-          <div class="summary-widget">
-            <div class="summary-header">
-              <div class="summary-title">
-                <i class="fa-solid fa-receipt" style="color:var(--accent);"></i>
-                <span>Розрахунок вартості супроводу</span>
-              </div>
-            </div>
-
-            <div class="summary-figures">
-              <div class="fig-item">
-                <div class="fig-label">Разовий платіж (Сетап)</div>
-                <div class="fig-amount" id="setupPrice">0 грн</div>
-              </div>
-              <div class="fig-item">
-                <div class="fig-label">Щомісячний ретейнер</div>
-                <div class="fig-amount" id="monthlyPrice">25 000 грн</div>
-              </div>
-              <div class="fig-item highlight">
-                <div class="fig-label">Разом за перший місяць</div>
-                <div class="fig-amount" id="firstMonthTotal">25 000 грн</div>
-              </div>
-            </div>
-
-            <div class="summary-actions">
-              <button class="btn-primary-action" id="btnCopyProposal">
-                <i class="fa-solid fa-copy"></i>
-                <span>Копіювати КП для клієнта</span>
-              </button>
-              <button class="btn-secondary-action" id="btnSaveClient" title="Зберегти поточну конфігурацію в базу">
-                <i class="fa-solid fa-bookmark"></i>
-                <span>Зберегти розрахунок</span>
-              </button>
-            </div>
-          </div>
-
         </div>
 
+        <!-- Channel Cards Grid (Toggle Multi-channel) -->
+        <div class="channels-selector-grid" id="channelSelectors">
+          <!-- Populated by app.js -->
+        </div>
+
+        <!-- Project Meta: Client name and account status -->
+        <div class="project-meta-bar">
+          <div class="input-box">
+            <label class="input-caption" for="clientName">Назва проєкту / Клієнт</label>
+            <input type="text" id="clientName" class="input-field" placeholder="Наприклад: Мережка, SkyStore, Тотоша..." />
+          </div>
+
+          <div class="input-box">
+            <label class="input-caption">Статус рекламного акаунта</label>
+            <div class="toggle-group">
+              <button type="button" class="toggle-btn active" id="statusExisting" title="Сетап 0 ₴, якщо кампанії вже працюють або не потребують повної перебудови структури">
+                Діючий акаунт (Сетап 0 ₴)
+              </button>
+              <button type="button" class="toggle-btn" id="statusNew" title="Включає разовий первинний сетап: збір семантики/пікселів, архітектуру кампаній">
+                Запуск з нуля (із сетапом)
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <!-- RIGHT: Interactive Knowledge Base & Explainer -->
-      <aside class="kb-column">
-        
-        <div class="card-box">
-          <div class="card-title">
-            <span><i class="fa-solid fa-book-open"></i> База знань та обґрунтування нормативів</span>
-          </div>
+      <!-- 2. Dynamic Channel Modules (Tiers, PM Advice & Channel Addons) -->
+      <div id="channelModulesContainer">
+        <!-- Populated by app.js based on active channels -->
+      </div>
 
-          <!-- Search Input -->
-          <div class="kb-search-box">
-            <i class="fa-solid fa-magnifying-glass kb-search-icon"></i>
-            <input type="text" id="kbSearch" class="kb-search-input" placeholder="Швидкий пошук: монтаж, 4:5, мережка, crm, ліміти..." />
-          </div>
-
-          <!-- Category Tags -->
-          <div class="kb-tags" id="kbTags">
-            <!-- Rendered by app.js -->
-          </div>
-
-          <!-- KB Accordion List -->
-          <div class="kb-list" id="kbList">
-            <!-- Rendered by app.js -->
-          </div>
-
-          <!-- Visual Safe Zones Box Model -->
-          <div style="margin-top: 24px; padding: 18px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid var(--line);">
-            <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #93c5fd; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-crop-simple"></i> Стандарт пропорцій креативів IMREV
+      <!-- 3. Visual Infographic: Agency Creative & Video Standards -->
+      <section class="section-card" style="background: linear-gradient(180deg, #ffffff, #f8fafc);">
+        <div class="section-head">
+          <div>
+            <div class="section-title">
+              <i class="fa-solid fa-crop-simple"></i> Стандарти графіки та відео IMREV (Пам'ятка для PM)
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
-              <div style="background: rgba(255,255,255,0.03); padding: 12px 6px; border-radius: 8px; border: 1px dashed rgba(110,168,254,0.4);">
-                <div style="font-family: var(--mono); font-weight: 800; font-size: 13px; color: #6ea8fe;">9:16</div>
-                <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">Stories / Reels</div>
-                <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">1080 × 1920</div>
-              </div>
-              <div style="background: rgba(16,185,129,0.08); padding: 12px 6px; border-radius: 8px; border: 1px solid var(--good);">
-                <div style="font-family: var(--mono); font-weight: 800; font-size: 13px; color: #34d399;">4:5 (+25%)</div>
-                <div style="font-size: 11px; color: #34d399; margin-top: 2px;">Feed мобільний</div>
-                <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">1080 × 1350</div>
-              </div>
-              <div style="background: rgba(255,255,255,0.03); padding: 12px 6px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.2);">
-                <div style="font-family: var(--mono); font-weight: 800; font-size: 13px; color: #fff;">1:1</div>
-                <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">Квадрат / Десктоп</div>
-                <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">1200 × 1200</div>
-              </div>
-            </div>
-            <div style="font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.4;">
-              * Дизайнер готує кожен сюжет у всіх трьох форматах, щоб охопити 100% доступних плейсментів без спотворення графіки.
+            <div class="section-desc">
+              Суворі технічні рамки, які захищають команду від безкінечних правок та перевитрати людиногодин
             </div>
           </div>
-
         </div>
 
-      </aside>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;">
+          <!-- Card 1: Safe Zones Formats -->
+          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-clone" style="color: var(--accent-blue);"></i> 3 формати під кожен статичний сюжет
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-bottom: 12px;">
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: var(--accent-blue);">9:16</div>
+                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Stories / Reels</div>
+                <div style="font-size: 10px; color: #64748b;">1080×1920</div>
+              </div>
+              <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: #059669;">4:5 (+25%)</div>
+                <div style="font-size: 11px; color: #047857; margin-top: 2px;">Feed мобільний</div>
+                <div style="font-size: 10px; color: #059669;">1080×1350</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: #081942;">1:1</div>
+                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Feed десктоп</div>
+                <div style="font-size: 10px; color: #64748b;">1200×1200</div>
+              </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+              Формат 4:5 займає на чверть більше висоти екрану смартфона у стрічці Instagram/FB, ніж 1:1, суттєво підвищуючи CTR.
+            </div>
+          </div>
+
+          <!-- Card 2: Video Rules -->
+          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 800; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-triangle-exclamation"></i> Регламент по відео: БЕЗ МОНТАЖУ
+            </div>
+            <ul style="font-size: 12.5px; color: var(--text-body); list-style: none; display: flex; flex-direction: column; gap: 8px;">
+              <li style="display: flex; gap: 8px;">
+                <i class="fa-solid fa-ban" style="color: #ef4444; margin-top: 3px;"></i>
+                <span><strong>Агенція не монтує відео з сирих шматків:</strong> не склеює нарізки з телефону, не вирізає дихання, не накладає музику.</span>
+              </li>
+              <li style="display: flex; gap: 8px;">
+                <i class="fa-solid fa-check" style="color: #10b981; margin-top: 3px;"></i>
+                <span><strong>Що робить дизайнер:</strong> приймає <em>готове змонтоване відео</em>, обрізає під Safe Zones (4:5, 9:16), додає фірмову плашку з офером, логотипом або стрілкою.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. PM Operational Knowledge Base & Scripts -->
+      <section class="section-card kb-section">
+        <div class="section-head">
+          <div>
+            <div class="section-title">
+              <i class="fa-solid fa-graduation-cap"></i> База знань та готові скрипти для PM
+            </div>
+            <div class="section-desc">
+              Обґрунтування кожної цифри та норми агентства: як аргументовано пояснити клієнту без конфліктів
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div style="margin-bottom: 16px;">
+          <div style="position: relative; display: flex; align-items: center;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; color: var(--text-muted);"></i>
+            <input type="text" id="pmGuideSearch" class="input-field" style="width: 100%; padding-left: 40px;" placeholder="Пошук норми або скрипта: відео, 4:5, мережка, crm, ліміти сюжетів, сетап..." />
+          </div>
+        </div>
+
+        <!-- Category Tags Filter -->
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;" id="pmGuideTags">
+          <!-- Populated by app.js -->
+        </div>
+
+        <!-- Accordion Cards -->
+        <div class="kb-grid" id="pmGuideList">
+          <!-- Populated by app.js -->
+        </div>
+      </section>
+
+      <!-- 5. Sticky Project Summary & Action Footer -->
+      <div class="project-summary-sticky">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">
+            Активні канали у розрахунку:
+          </div>
+          <div id="summaryChannelsList" style="font-size: 14px; font-weight: 800; color: var(--text-main);">
+            Meta Ads (Pro) + Google Ads (Pro)
+          </div>
+        </div>
+
+        <div class="summary-figures-row">
+          <div class="summary-fig">
+            <span class="summary-fig-label">Стартовий сетап</span>
+            <span class="summary-fig-val" id="totalSetupPrice">0 ₴</span>
+          </div>
+          <div class="summary-fig">
+            <span class="summary-fig-label">Щомісячний супровід</span>
+            <span class="summary-fig-val" id="totalMonthlyPrice">50 000 ₴</span>
+          </div>
+          <div class="summary-fig">
+            <span class="summary-fig-label">Перший місяць разом</span>
+            <span class="summary-fig-val highlight" id="totalFirstMonth">50 000 ₴</span>
+          </div>
+        </div>
+
+        <div class="summary-buttons">
+          <button type="button" class="btn-ws-copy" id="btnCopyWorksection" title="Скопіювати структуроване ТЗ та межі для таски у Worksection">
+            <i class="fa-solid fa-list-check"></i>
+            <span>ТЗ для Worksection</span>
+          </button>
+          <button type="button" class="btn-client-kp" id="btnCopyClientKp" title="Скопіювати охайне комерційне повідомлення для клієнта">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>КП для клієнта</span>
+          </button>
+        </div>
+      </div>
 
     </main>
 
   </div>
 
-  <!-- Modal for info clicks -->
+  <!-- Info Modal -->
   <div class="modal-overlay" id="infoModal">
-    <div class="modal-box">
-      <button class="modal-close" id="modalClose"><i class="fa-solid fa-xmark"></i></button>
-      <h3 id="modalTitle" style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 12px;"></h3>
-      <div id="modalBody" style="font-size: 14px; color: #cbd5e1; line-height: 1.6;"></div>
+    <div class="modal-content">
+      <button class="modal-close-btn" id="modalClose"><i class="fa-solid fa-xmark"></i></button>
+      <h3 id="modalTitle" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 12px;"></h3>
+      <div id="modalBody" style="font-size: 14px; color: var(--text-body); line-height: 1.6;"></div>
     </div>
   </div>
 
   <!-- Toast Notification -->
-  <div class="toast-msg" id="toastMsg"></div>
+  <div class="toast-notice" id="toastNotice"></div>
 
+  <!-- App Script -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
