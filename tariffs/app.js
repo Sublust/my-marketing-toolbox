@@ -92,6 +92,7 @@ function renderChannelCards() {
       }
       renderChannelCards();
       renderModules();
+      renderCreativeStandards();
       calculateTotals();
     });
   });
@@ -612,8 +613,152 @@ elBtnCopyClientKp.addEventListener('click', () => {
   });
 });
 
+// 7. Dynamic Creative & Video Standards based on active channels
+function renderCreativeStandards() {
+  const elStandards = document.getElementById('creativeStandardsSection');
+  if (!elStandards) return;
+
+  const hasMeta = state.activeChannels.includes('meta');
+  const hasGoogle = state.activeChannels.includes('google');
+
+  if (!hasMeta && !hasGoogle) {
+    elStandards.style.display = 'none';
+    return;
+  }
+  elStandards.style.display = 'block';
+
+  let channelText = 'обрані канали';
+  if (hasMeta && hasGoogle) channelText = 'Meta Ads + Google Ads';
+  else if (hasMeta) channelText = 'Meta Ads';
+  else if (hasGoogle) channelText = 'Google Ads';
+
+  let html = `
+    <div class="section-head">
+      <div>
+        <div class="section-title">
+          <i class="fa-solid fa-crop-simple"></i> Стандарти графіки та відео IMREV (${channelText})
+        </div>
+        <div class="section-desc">
+          Суворі технічні рамки підібрані під обрані канали, які захищають команду від безкінечних правок та зриву дедлайнів
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+  `;
+
+  if (hasMeta) {
+    html += `
+      <div>
+        ${hasGoogle ? '<div style="font-size:13px; font-weight:800; text-transform:uppercase; color:var(--text-main); margin-bottom:10px; display:flex; align-items:center; gap:8px;"><i class="fa-brands fa-meta" style="color:var(--accent-blue);"></i> Стандарти для Meta Ads (Instagram / FB)</div>' : ''}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;">
+          <!-- Meta Formats -->
+          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-clone" style="color: var(--accent-blue);"></i> 3 формати під кожен статичний сюжет Meta
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-bottom: 12px;">
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: var(--accent-blue);">9:16</div>
+                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Stories / Reels</div>
+                <div style="font-size: 10px; color: #64748b;">1080×1920</div>
+              </div>
+              <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: #059669;">4:5 (+25%)</div>
+                <div style="font-size: 11px; color: #047857; margin-top: 2px;">Feed мобільний</div>
+                <div style="font-size: 10px; color: #059669;">1080×1350</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: #081942;">1:1</div>
+                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Feed десктоп</div>
+                <div style="font-size: 10px; color: #64748b;">1200×1200</div>
+              </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+              Формат 4:5 займає на чверть більше висоти екрану смартфона у стрічці Instagram/FB, ніж 1:1, суттєво підвищуючи CTR.
+            </div>
+          </div>
+
+          <!-- Meta Video Rules -->
+          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 800; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-triangle-exclamation"></i> Регламент по відео Meta: БЕЗ МОНТАЖУ
+            </div>
+            <ul style="font-size: 12.5px; color: var(--text-body); list-style: none; display: flex; flex-direction: column; gap: 8px;">
+              <li style="display: flex; gap: 8px;">
+                <i class="fa-solid fa-ban" style="color: #ef4444; margin-top: 3px;"></i>
+                <span><strong>Агенція не монтує сирі матеріали:</strong> не склеює нарізки з телефону, не вирізає дихання, не накладає музику.</span>
+              </li>
+              <li style="display: flex; gap: 8px;">
+                <i class="fa-solid fa-check" style="color: #10b981; margin-top: 3px;"></i>
+                <span><strong>Що робить дизайнер:</strong> приймає <em>готовий змонтований ролик</em>, ресайзить під Safe Zones (4:5, 9:16, 1:1), додає плашку з офером/логотипом.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (hasGoogle) {
+    html += `
+      <div>
+        ${hasMeta ? '<div style="font-size:13px; font-weight:800; text-transform:uppercase; color:var(--text-main); margin-bottom:10px; display:flex; align-items:center; gap:8px;"><i class="fa-brands fa-google" style="color:var(--accent-blue);"></i> Стандарти для Google Ads (Search / PMax / Display)</div>' : ''}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;">
+          <!-- Google Formats -->
+          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-clone" style="color: var(--accent-blue);"></i> 3 формати під кожен сюжет Google Ads
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-bottom: 12px;">
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: var(--accent-blue);">1.91:1</div>
+                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Display / PMax</div>
+                <div style="font-size: 10px; color: #64748b;">1200×628</div>
+              </div>
+              <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: #059669;">1:1</div>
+                <div style="font-size: 11px; color: #047857; margin-top: 2px;">Квадрат універсал</div>
+                <div style="font-size: 10px; color: #059669;">1200×1200</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px 4px;">
+                <div style="font-weight: 900; font-size: 13px; color: #081942;">4:5 / 9:16</div>
+                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Вертикальний</div>
+                <div style="font-size: 10px; color: #64748b;">960×1200 / 1080×1920</div>
+              </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+              Адаптація сюжету у 3 формати (1.91:1, 1:1, 4:5/9:16) забезпечує 100% покриття майданчиків Performance Max та КМС без автоматичної обрізки Google.
+            </div>
+          </div>
+
+          <!-- Google Video Rules -->
+          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 800; color: var(--primary-blue); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-brands fa-youtube" style="color:#ef4444;"></i> Регламент по відео Google: YouTube-канал
+            </div>
+            <ul style="font-size: 12.5px; color: var(--text-body); list-style: none; display: flex; flex-direction: column; gap: 8px;">
+              <li style="display: flex; gap: 8px;">
+                <i class="fa-solid fa-arrow-up-from-bracket" style="color: var(--accent-blue); margin-top: 3px;"></i>
+                <span><strong>Завантаження на YouTube:</strong> відеоматеріали клієнт завантажує на свій YouTube-канал (Google Ads бере готові посилання).</span>
+              </li>
+              <li style="display: flex; gap: 8px;">
+                <i class="fa-solid fa-wrench" style="color: #10b981; margin-top: 3px;"></i>
+                <span><strong>Адаптація як Add-on:</strong> якщо потрібна нарізка ролика під YouTube Shorts/PMax (до 30 сек, субтитри, плашка) — це окрема послуга <strong>+1 500 ₴/ролик</strong>.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  elStandards.innerHTML = html;
+}
+
 // Initial Render
 renderChannelCards();
 renderModules();
+renderCreativeStandards();
 calculateTotals();
 renderPmGuide();

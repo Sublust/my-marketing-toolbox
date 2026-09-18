@@ -78,64 +78,9 @@
         <!-- Populated by app.js based on active channels -->
       </div>
 
-      <!-- 3. Visual Infographic: Agency Creative & Video Standards -->
-      <section class="section-card" style="background: linear-gradient(180deg, #ffffff, #f8fafc);">
-        <div class="section-head">
-          <div>
-            <div class="section-title">
-              <i class="fa-solid fa-crop-simple"></i> Стандарти графіки та відео IMREV (Пам'ятка для PM)
-            </div>
-            <div class="section-desc">
-              Суворі технічні рамки, які захищають команду від безкінечних правок та перевитрати людиногодин
-            </div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;">
-          <!-- Card 1: Safe Zones Formats -->
-          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-clone" style="color: var(--accent-blue);"></i> 3 формати під кожен статичний сюжет
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-bottom: 12px;">
-              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 4px;">
-                <div style="font-weight: 900; font-size: 13px; color: var(--accent-blue);">9:16</div>
-                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Stories / Reels</div>
-                <div style="font-size: 10px; color: #64748b;">1080×1920</div>
-              </div>
-              <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 8px; padding: 10px 4px;">
-                <div style="font-weight: 900; font-size: 13px; color: #059669;">4:5 (+25%)</div>
-                <div style="font-size: 11px; color: #047857; margin-top: 2px;">Feed мобільний</div>
-                <div style="font-size: 10px; color: #059669;">1080×1350</div>
-              </div>
-              <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px 4px;">
-                <div style="font-weight: 900; font-size: 13px; color: #081942;">1:1</div>
-                <div style="font-size: 11px; color: #475569; margin-top: 2px;">Feed десктоп</div>
-                <div style="font-size: 10px; color: #64748b;">1200×1200</div>
-              </div>
-            </div>
-            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
-              Формат 4:5 займає на чверть більше висоти екрану смартфона у стрічці Instagram/FB, ніж 1:1, суттєво підвищуючи CTR.
-            </div>
-          </div>
-
-          <!-- Card 2: Video Rules -->
-          <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 13px; font-weight: 800; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-triangle-exclamation"></i> Регламент по відео: БЕЗ МОНТАЖУ
-            </div>
-            <ul style="font-size: 12.5px; color: var(--text-body); list-style: none; display: flex; flex-direction: column; gap: 8px;">
-              <li style="display: flex; gap: 8px;">
-                <i class="fa-solid fa-ban" style="color: #ef4444; margin-top: 3px;"></i>
-                <span><strong>Агенція не монтує відео з сирих шматків:</strong> не склеює нарізки з телефону, не вирізає дихання, не накладає музику.</span>
-              </li>
-              <li style="display: flex; gap: 8px;">
-                <i class="fa-solid fa-check" style="color: #10b981; margin-top: 3px;"></i>
-                <span><strong>Що робить дизайнер:</strong> приймає <em>готове змонтоване відео</em>, обрізає під Safe Zones (4:5, 9:16), додає фірмову плашку з офером, логотипом або стрілкою.</span>
-              </li>
-            </ul>
-          </div>
-        </div>
+      <!-- 3. Visual Infographic: Agency Creative & Video Standards (Dynamically rendered by app.js) -->
+      <section class="section-card" id="creativeStandardsSection" style="background: linear-gradient(180deg, #ffffff, #f8fafc);">
+        <!-- Populated dynamically by renderCreativeStandards() in app.js -->
       </section>
 
       <!-- 4. PM Operational Knowledge Base & Scripts -->
